@@ -1,7 +1,7 @@
 package systemd
 
 import (
-	"log"
+	"fmt"
 	"os/exec"
 
 	"github.com/crowdstrike/falcon-installer/pkg/utils"
@@ -9,11 +9,16 @@ import (
 
 const systemctlCmd = "/usr/bin/systemctl"
 
-func RestartService(name string) {
-	if _, err := exec.LookPath(systemctlCmd); err == nil {
-		args := []string{"restart", name}
-		utils.RunCmd(exec.Command(systemctlCmd, args...))
-	} else {
-		log.Fatalf("Could not find systemctl: %s", systemctlCmd)
+// RestartService restarts a systemd service
+func RestartService(name string) error {
+	if _, err := exec.LookPath(systemctlCmd); err != nil {
+		return fmt.Errorf("Could not find systemctl: %s", systemctlCmd)
 	}
+
+	args := []string{"restart", name}
+	if _, _, err := utils.RunCmd(systemctlCmd, args); err != nil {
+		return fmt.Errorf("Error restarting service %s: %v", name, err)
+	}
+
+	return nil
 }

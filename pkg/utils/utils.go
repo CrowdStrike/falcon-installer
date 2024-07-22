@@ -2,23 +2,20 @@ package utils
 
 import (
 	"bytes"
+	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
+	"strings"
 )
 
-func IsWindowsAdmin() bool {
-	_, err := os.Open("\\\\.\\PHYSICALDRIVE0")
-	if err != nil {
-		return false
-	}
-	return true
-}
-
-func RunCmdWithEnv(c *exec.Cmd, env []string, arg ...string) ([]byte, []byte, error) {
+func RunCmdWithEnv(cmnd string, env string, arg []string) ([]byte, []byte, error) {
 	var stdout, stderr bytes.Buffer
+	c := exec.Command(cmnd, arg...)
+
 	if len(env) > 0 {
 		c.Env = os.Environ()
-		c.Env = append(c.Env, env...)
+		c.Env = append(c.Env, env)
 	}
 
 	if c.Stdout == nil {
@@ -32,8 +29,10 @@ func RunCmdWithEnv(c *exec.Cmd, env []string, arg ...string) ([]byte, []byte, er
 	return stdout.Bytes(), stderr.Bytes(), err
 }
 
-func RunCmd(c *exec.Cmd, arg ...string) ([]byte, []byte, error) {
+func RunCmd(cmnd string, arg []string) ([]byte, []byte, error) {
 	var stdout, stderr bytes.Buffer
+	c := exec.Command(cmnd, arg...)
+
 	if c.Stdout == nil {
 		c.Stdout = &stdout
 	}
@@ -43,4 +42,30 @@ func RunCmd(c *exec.Cmd, arg ...string) ([]byte, []byte, error) {
 
 	err := c.Run()
 	return stdout.Bytes(), stderr.Bytes(), err
+}
+
+// OpenFileForWriting opens a file for writing, creating the directory if it doesn't exist
+func OpenFileForWriting(dir, filename string) (*os.File, error) {
+	if strings.Contains(filename, "/") {
+		return nil, fmt.Errorf("Refusing to download: '%s' includes '/' character", filename)
+	}
+	path := filepath.Join(dir, filename)
+	safeLocation := filepath.Clean(path)
+	if strings.Contains(safeLocation, "..") {
+		return nil, fmt.Errorf("Refusing to download: Path '%s' looks suspicious", safeLocation)
+	}
+	if err := os.MkdirAll(dir, 0700); err != nil {
+		return nil, err
+	}
+	return os.OpenFile(safeLocation, os.O_CREATE|os.O_WRONLY, 0600)
+}
+
+func WriteToLogFile(logFile string) error {
+	logfile, err := os.OpenFile(logFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0600)
+	if err != nil {
+		return fmt.Errorf("Error opening log file: %v", err)
+	}
+	defer logfile.Close()
+
+	return nil
 }

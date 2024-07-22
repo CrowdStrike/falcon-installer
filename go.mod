@@ -2,13 +2,11 @@ module github.com/crowdstrike/falcon-installer
 
 go 1.22.4
 
-require (
-	github.com/blang/semver/v4 v4.0.0
-	github.com/crowdstrike/gofalcon v0.6.1-0.20240605161449-be5c9bef3e6a
-)
+require github.com/crowdstrike/gofalcon v0.6.1-0.20240605161449-be5c9bef3e6a
 
 require (
 	github.com/asaskevich/govalidator v0.0.0-20230301143203-a9d515a09cc2 // indirect
+	github.com/blang/semver/v4 v4.0.0 // indirect
 	github.com/go-logr/logr v1.3.0 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-openapi/analysis v0.22.2 // indirect

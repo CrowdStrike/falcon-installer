@@ -1,9 +1,7 @@
 package version
 
-import (
-	"github.com/blang/semver/v4"
-)
-
 var (
-	Version = semver.MustParse("0.1.0")
+	Version = "0.0.0+dev"
+	Commit  = "unknown"
+	Date    = "unknown"
 )
