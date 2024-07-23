@@ -1,0 +1,22 @@
+run:
+  timeout: 5m
+enable:
+    - durationcheck
+    - errcheck
+    - exportloopref
+    - forcetypeassert
+    - godot
+    - gofmt
+    - gosec
+    - gosimple
+    - ineffassign
+    - makezero
+    - misspell
+    - nilerr
+    - predeclared
+    - staticcheck
+    - tenv
+    - unconvert
+    - unparam
+    - unused
+    - vet

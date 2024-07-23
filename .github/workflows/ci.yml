@@ -1,0 +1,59 @@
+name: ci
+
+on:
+  pull_request:
+    paths-ignore:
+      - "README.md"
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - "README.md"
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+      - uses: actions/setup-go@0c52d547c9bc32b1aa3301fd7a9cb496313a4491 # v5.0.0
+        with:
+          go-version-file: "go.mod"
+          cache: false
+
+      - name: Ensure go modules are tidy
+        run: |
+          go mod tidy
+          if [[ -n $(git status -s) ]] ; then
+            echo
+            echo -e "\e[31mRunning 'go mod tidy' changes the current setting"
+            echo -e "\e[31mEnsure to include updated go.mod and go.sum in this PR."
+            echo -e "\e[31mThis is usually done by running 'go mod tidy'\e[0m"
+            git status -s
+            git diff --color
+            exit 1
+          fi
+
+      - name: Run linters
+        uses: golangci/golangci-lint-action@3cfe3a4abbb849e10058ce4af15d205b6da42804 # v4.0.0
+        with:
+          args: --out-format=colored-line-number
+          version: latest
+
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+
+      - uses: actions/setup-go@0c52d547c9bc32b1aa3301fd7a9cb496313a4491 # v5.0.0
+        with:
+          go-version-file: "go.mod"
+          cache: false
+
+      - run: go mod download
+
+      - run: go build cmd/main.go
