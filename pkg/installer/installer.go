@@ -190,6 +190,12 @@ func (fi FalconInstaller) osArgHandler(arg, val string) string {
 
 	switch fi.OS {
 	case "windows":
+		if fi.SensorConfig.APD == "true" {
+			val = "1"
+		} else if fi.SensorConfig.APD == "false" {
+			val = "0"
+		}
+
 		return fmt.Sprintf("%s=%s", windowsFalconMap[arg], val)
 	default:
 		return fmt.Sprintf("--%s=%s", arg, val)
