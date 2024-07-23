@@ -89,7 +89,7 @@ func main() {
 	flag.Parse()
 
 	if *versionFlag {
-		fmt.Printf("falcon-installer %s, commit: %s, date: %s\n", version.Version, version.Commit, version.Date)
+		fmt.Printf("falcon-installer %s <commit: %s>\n", version.Version, version.Commit)
 		os.Exit(0)
 	}
 
