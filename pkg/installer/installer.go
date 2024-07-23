@@ -89,7 +89,9 @@ func Run(fc FalconInstaller) {
 					log.Fatalf("Error writing GPG key to file: %v", err)
 				}
 				slog.Debug("Using embedded GPG key", "GPG Key", gpgKeyFile, "Key", gpgPublicKey)
-				rpm.GpgKeyImport(gpgKeyFile)
+				if err = rpm.GpgKeyImport(gpgKeyFile); err != nil {
+					log.Fatalf("Error importing GPG key: %v", err)
+				}
 			}
 
 		}
@@ -444,5 +446,3 @@ func configureLinuxSensor(args []string) error {
 
 	return nil
 }
-
-type void struct{}

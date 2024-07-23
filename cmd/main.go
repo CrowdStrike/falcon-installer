@@ -24,11 +24,6 @@ var (
 	logFile       = fmt.Sprintf("%s%s%s", defaultTmpDir, string(os.PathSeparator), "falcon-installer.log")
 )
 
-type Writer struct {
-	stdout *os.File
-	file   *os.File
-}
-
 func init() {
 	switch targetOS = runtime.GOOS; targetOS {
 	case "linux":

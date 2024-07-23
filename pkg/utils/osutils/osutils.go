@@ -59,10 +59,7 @@ func RunningWithPrivileges(targetOS string) (bool, error) {
 // IsWindowsAdmin checks if the user is running as an Administrator on Windows
 func isWindowsAdmin() bool {
 	_, err := os.Open("\\\\.\\PHYSICALDRIVE0")
-	if err != nil {
-		return false
-	}
-	return true
+	return err == nil
 }
 
 // ReadEtcRelease reads the /etc/os-release file on Linux and returns the OS name and version
