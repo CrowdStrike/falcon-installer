@@ -59,13 +59,3 @@ func OpenFileForWriting(dir, filename string) (*os.File, error) {
 	}
 	return os.OpenFile(safeLocation, os.O_CREATE|os.O_WRONLY, 0600)
 }
-
-func WriteToLogFile(logFile string) error {
-	logfile, err := os.OpenFile(logFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0600)
-	if err != nil {
-		return fmt.Errorf("Error opening log file: %v", err)
-	}
-	defer logfile.Close()
-
-	return nil
-}
