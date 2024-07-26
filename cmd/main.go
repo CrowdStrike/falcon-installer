@@ -160,7 +160,6 @@ func main() {
 		MemberCID:    *memberCID,
 
 		SensorUpdatePolicyName: *updatePolicyName,
-		GpgKeyFile:             *gpgKeyFile,
 		OsName:                 osName,
 		OsVersion:              osVersion,
 		OS:                     targetOS,
@@ -170,7 +169,22 @@ func main() {
 
 		SensorConfig: fc,
 	}
+
+	if isFlag("gpg-key") {
+		fi.GpgKeyFile = *gpgKeyFile
+	}
+
 	slog.Debug("Falcon installer options", "Cloud", fi.Cloud, "MemberCID", fi.MemberCID, "SensorUpdatePolicyName", fi.SensorUpdatePolicyName, "GpgKeyFile", fi.GpgKeyFile, "TmpDir", fi.TmpDir, "OsName", fi.OsName, "OsVersion", fi.OsVersion, "OS", fi.OS, "Arch", fi.Arch, "UserAgent", fi.UserAgent)
 
 	installer.Run(fi)
+}
+
+func isFlag(name string) bool {
+	exists := false
+	flag.Visit(func(f *flag.Flag) {
+		if f.Name == name {
+			exists = true
+		}
+	})
+	return exists
 }
