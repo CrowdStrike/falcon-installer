@@ -29,7 +29,6 @@ builds:
       - amd64
       - arm64
       - s390x
-
     ignore:
       - goos: windows
         goarch: 386
@@ -37,7 +36,8 @@ builds:
         goarch: s390x
 
 archives:
-  - format: tar.gz
+  - id: archives
+    format: tar.gz
     # this name template makes the OS and Arch compatible with the results of `uname`.
     name_template: >-
       {{ .ProjectName }}-
@@ -50,6 +50,17 @@ archives:
     format_overrides:
       - goos: windows
         format: zip
+
+  - id: binary
+    format: binary
+    # this name template makes the OS and Arch compatible with the results of `uname`.
+    name_template: >-
+      {{ .ProjectName }}-
+      {{- .Version }}-
+      {{- .Os }}-
+      {{- if eq .Arch "amd64" }}x86_64
+      {{- else }}{{ .Arch }}{{ end }}
+      {{- if .Arm }}v{{ .Arm }}{{ end }}
 
 checksum:
   name_template: checksums.txt
