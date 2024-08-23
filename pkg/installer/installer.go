@@ -24,7 +24,15 @@ import (
 const falconInstallDir = "/opt/CrowdStrike"
 
 var (
-	enterpriseLinux = []string{"rhel", "centos", "oracle", "almalinux", "rocky"}
+	enterpriseLinux     = []string{"rhel", "centos", "oracle", "almalinux", "rocky"}
+	windowsFalconArgMap = map[string]string{
+		"cid":                "CID",
+		"provisioning-token": "ProvToken",
+		"tags":               "GROUPING_TAGS",
+		"apd":                "PROXYDISABLE",
+		"aph":                "APP_PROXYNAME",
+		"app":                "APP_PROXYPORT",
+	}
 )
 
 type FalconSensorCLI struct {
@@ -179,15 +187,6 @@ func (fi FalconInstaller) falconArgs() []string {
 
 // osArgHandler handles the formatting of arguments for the Falcon sensor installer based on the OS
 func (fi FalconInstaller) osArgHandler(arg, val string) string {
-	windowsFalconMap := map[string]string{
-		"cid":                "CID",
-		"provisioning-token": "ProvToken",
-		"tags":               "GROUPING_TAGS",
-		"apd":                "PROXYDISABLE",
-		"aph":                "APP_PROXYNAME",
-		"app":                "APP_PROXYPORT",
-	}
-
 	switch fi.OS {
 	case "windows":
 		if fi.SensorConfig.APD == "true" {
@@ -196,7 +195,7 @@ func (fi FalconInstaller) osArgHandler(arg, val string) string {
 			val = "0"
 		}
 
-		return fmt.Sprintf("%s=%s", windowsFalconMap[arg], val)
+		return fmt.Sprintf("%s=%s", windowsFalconArgMap[arg], val)
 	default:
 		return fmt.Sprintf("--%s=%s", arg, val)
 	}
@@ -232,7 +231,7 @@ func (fi FalconInstaller) getSensorUpdatePolicies(client *client.CrowdStrikeAPIS
 		log.Fatal(err)
 	}
 
-	senserVersion := ""
+	sensorVersion := ""
 	for _, policy := range payload.Resources {
 		if *policy.Enabled && *policy.Settings.Stage == "prod" {
 			switch fi.OS {
@@ -241,28 +240,28 @@ func (fi FalconInstaller) getSensorUpdatePolicies(client *client.CrowdStrikeAPIS
 				case "arm64":
 					for _, variant := range policy.Settings.Variants {
 						if strings.Contains(strings.ToLower(*variant.Platform), "arm64") {
-							senserVersion = *variant.SensorVersion
-							slog.Debug("arm64 sensor update policy versions", "Version", senserVersion)
+							sensorVersion = *variant.SensorVersion
+							slog.Debug("arm64 sensor update policy versions", "Version", sensorVersion)
 						}
 					}
 				case "s390x":
 					for _, variant := range policy.Settings.Variants {
 						if strings.Contains(strings.ToLower(*variant.Platform), "zlinux") {
-							senserVersion = *variant.SensorVersion
-							slog.Debug("zLinux sensor update policy version", "Version", senserVersion)
+							sensorVersion = *variant.SensorVersion
+							slog.Debug("zLinux sensor update policy version", "Version", sensorVersion)
 						}
 					}
 				default:
-					senserVersion = *policy.Settings.SensorVersion
+					sensorVersion = *policy.Settings.SensorVersion
 				}
 			default:
-				senserVersion = *policy.Settings.SensorVersion
+				sensorVersion = *policy.Settings.SensorVersion
 			}
 		}
 	}
 
-	slog.Debug("Found suitable Falcon sensor version from sensor update policies", "Version", senserVersion)
-	return senserVersion
+	slog.Debug("Found suitable Falcon sensor version from sensor update policies", "Version", sensorVersion)
+	return sensorVersion
 }
 
 // getSensors queries the CrowdStrike API for Falcon sensors that match the provided OS name, version, and architecture
