@@ -66,9 +66,9 @@ func main() {
 
 	// Falcon sensor flags
 	falconCID := flag.String("cid", os.Getenv("FALCON_CID"), "Falcon Customer ID")
-	falconToken := flag.String("provisioning-token", os.Getenv("FALCON_PROVISIONING_TOKEN"), "The provisioning token to use for installing the sensor")
-	falconTags := flag.String("tags", os.Getenv("FALCON_TAGS"), "A comma seperated list of tags for sensor grouping.")
-	falconAPD := flag.String("apd", os.Getenv("FALCON_APD"), "Configures if the proxy should be enabled or disabled, By default, the proxy is enabled.")
+	falconToken := flag.String("provisioning-token", os.Getenv("FALCON_PROVISIONING_TOKEN"), "The provisioning token to use for installing the sensor. If not provided, the API will attempt to retrieve a token")
+	falconTags := flag.String("tags", os.Getenv("FALCON_TAGS"), "A comma seperated list of tags for sensor grouping")
+	falconAPD := flag.String("apd", os.Getenv("FALCON_APD"), "Configures if the proxy should be enabled or disabled. By default, the proxy is enabled")
 	falconAPH := flag.String("aph", os.Getenv("FALCON_APH"), "The proxy host for the sensor to use when communicating with CrowdStrike")
 	falconAPP := flag.String("app", os.Getenv("FALCON_APP"), "The proxy port for the sensor to use when communicating with CrowdStrike")
 	updatePolicyName := flag.String("sensor-update-policy", os.Getenv("FALCON_SENSOR_UPDATE_POLICY_NAME"), "The sensor update policy name to use for sensor installation")
