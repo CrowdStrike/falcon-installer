@@ -7,9 +7,12 @@ API clients are granted one or more API scopes. Scopes allow access to specific 
 
 Ensure the following API scopes are enabled:
 
-- **Sensor Download** [read]
-- (optional) **Sensor update policies** [read]
-  > Use this scope when configuring the `-sensor-update-policy` cli flag or the`FALCON_SENSOR_UPDATE_POLICY_NAME` environment variable.
+> [!IMPORTANT]
+> - **Sensor Download** [read]
+> - (optional) **Installation Tokens** [read]
+>   > This scope allows the installer to retrieve a provisioning token from the API, but only if installation tokens are required in your environment.
+> - (optional) **Sensor update policies** [read]
+>   > Use this scope when configuring the `FALCON_SENSOR_UPDATE_POLICY_NAME` environment variable.
 
 ## Usage
 

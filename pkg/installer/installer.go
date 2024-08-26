@@ -16,6 +16,7 @@ import (
 	"github.com/crowdstrike/falcon-installer/pkg/utils/osutils"
 	"github.com/crowdstrike/gofalcon/falcon"
 	"github.com/crowdstrike/gofalcon/falcon/client"
+	"github.com/crowdstrike/gofalcon/falcon/client/installation_tokens"
 	"github.com/crowdstrike/gofalcon/falcon/client/sensor_download"
 	"github.com/crowdstrike/gofalcon/falcon/client/sensor_update_policies"
 	"github.com/crowdstrike/gofalcon/falcon/models"
@@ -80,6 +81,13 @@ func Run(fc FalconInstaller) {
 	}
 
 	falconArgs := fc.falconArgs()
+
+	if fc.SensorConfig.ProvisioningToken == "" {
+		fc.SensorConfig.ProvisioningToken = fc.getSensorProvisioningToken(client)
+		if fc.SensorConfig.ProvisioningToken != "" {
+			falconArgs = append(falconArgs, fc.osArgHandler("provisioning-token", fc.SensorConfig.ProvisioningToken))
+		}
+	}
 
 	if !falconInstalled {
 		if rpm.IsRpmInstalled() {
@@ -199,6 +207,85 @@ func (fi FalconInstaller) osArgHandler(arg, val string) string {
 	default:
 		return fmt.Sprintf("--%s=%s", arg, val)
 	}
+}
+
+// getSensorProvisioningToken queries the CrowdStrike API for the sensor provisioning token
+func (fi FalconInstaller) getSensorProvisioningToken(client *client.CrowdStrikeAPISpecification) string {
+	res, err := client.InstallationTokens.CustomerSettingsRead(
+		&installation_tokens.CustomerSettingsReadParams{
+			Context: context.Background(),
+		},
+	)
+	if err != nil {
+		errPayload := falcon.ErrorExtractPayload(err)
+		if errPayload == nil {
+			log.Fatal(falcon.ErrorExplain(err))
+		}
+
+		bytes, err := errPayload.MarshalBinary()
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		if strings.Contains(string(bytes), "\"code\":403,\"message\":\"access denied, authorization failed\"") {
+			slog.Warn("Skipping getting installation tokens because the OAuth scope does not have permission to read installation tokens. If you are using provisioning tokens, please provide the token via CLI or update the OAuth2 client with the `Installation Tokens: Read` scope.")
+			return ""
+		} else {
+			log.Fatal(falcon.ErrorExplain(err))
+		}
+	}
+
+	payload := res.GetPayload()
+	if err = falcon.AssertNoError(payload.Errors); err != nil {
+		log.Fatal(err)
+	}
+
+	token := ""
+	if payload.Resources[0].TokensRequired != nil && *payload.Resources[0].TokensRequired {
+		token = fi.getToken(client, fi.getTokenList(client))
+		slog.Debug("Found suitable Falcon installation token", "Token", token)
+	}
+
+	return token
+}
+
+// getTokenList queries the CrowdStrike API for the installation tokens
+func (fi FalconInstaller) getTokenList(client *client.CrowdStrikeAPISpecification) []string {
+	res, err := client.InstallationTokens.TokensQuery(
+		&installation_tokens.TokensQueryParams{
+			Context: context.Background(),
+		},
+	)
+	if err != nil {
+		log.Fatal(falcon.ErrorExplain(err))
+	}
+
+	payload := res.GetPayload()
+	if err = falcon.AssertNoError(payload.Errors); err != nil {
+		log.Fatal(err)
+	}
+
+	return payload.Resources
+}
+
+// getToken queries the CrowdStrike API for the installation token using the token ID
+func (fi FalconInstaller) getToken(client *client.CrowdStrikeAPISpecification, tokenList []string) string {
+	res, err := client.InstallationTokens.TokensRead(
+		&installation_tokens.TokensReadParams{
+			Context: context.Background(),
+			Ids:     tokenList,
+		},
+	)
+	if err != nil {
+		log.Fatal(falcon.ErrorExplain(err))
+	}
+
+	payload := res.GetPayload()
+	if err = falcon.AssertNoError(payload.Errors); err != nil {
+		log.Fatal(err)
+	}
+
+	return *payload.Resources[0].Value
 }
 
 // getSensorUpdatePolicies queries the CrowdStrike API for sensor update policies that match the provided policy name and architecture
