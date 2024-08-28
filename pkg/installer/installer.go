@@ -482,10 +482,11 @@ func (fi FalconInstaller) download(client *client.CrowdStrikeAPISpecification, s
 func (fi FalconInstaller) installSensor(path string) {
 	c := ""
 	env := ""
-	args := []string{}
+	//
 
 	switch fi.OS {
 	case "linux":
+		args := []string{} //nolint:staticcheck
 		if cmd, err := exec.LookPath("/usr/bin/dnf"); err == nil {
 			c = cmd
 			args = []string{"install", "-q", "-y", path}
