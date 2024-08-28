@@ -29,7 +29,7 @@ func FalconInstalled(targetOS string) (bool, error) {
 			return falconInstalled, fmt.Errorf("Error querying service manager: %v", err)
 		}
 
-		return falconInstalled, fmt.Errorf("Unable to determine if Falcon Sensor is installed and running")
+		return falconInstalled, nil
 	}
 
 	return falconInstalled, fmt.Errorf("Unable to determine if Falcon Sensor is installed and running. Unsupported OS: %s", targetOS)
@@ -110,18 +110,18 @@ func packageManagerQuery(name string) (bool, error) {
 // scQuery queries the Windows service manager for the presence of a service
 func scQuery(name string) (bool, error) {
 	var err error
-	if cmd, err := exec.LookPath("sc.exe"); err != nil {
-		args := []string{"query", name}
-
-		if _, stderr, err := utils.RunCmd(cmd, args); err != nil {
-			if strings.Contains(string(stderr), "does not exist") {
-				return false, nil
-			}
-			return false, fmt.Errorf("Error running sc query: %v", err)
-		}
-
-		return true, nil
+	cmd, err := exec.LookPath("sc.exe")
+	if err != nil {
+		return false, fmt.Errorf("Unable to find sc.exe: %v", err)
 	}
 
-	return false, err
+	args := []string{"query", name}
+	if stdout, _, err := utils.RunCmd(cmd, args); err != nil {
+		if strings.Contains(string(stdout), "The specified service does not exist as an installed service") {
+			return false, nil
+		}
+		return false, fmt.Errorf("Error running sc query: %v", err)
+	}
+
+	return true, nil
 }

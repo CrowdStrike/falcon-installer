@@ -16,44 +16,58 @@ Ensure the following API scopes are enabled:
 
 ## Usage
 
-```bash
+```shell
 Usage of falcon-installer:
-  -apd string
+  --apd string
         Configures if the proxy should be enabled or disabled, By default, the proxy is enabled.
-  -aph string
+  --aph string
         The proxy host for the sensor to use when communicating with CrowdStrike
-  -app string
+  --app string
         The proxy port for the sensor to use when communicating with CrowdStrike
-  -cid string
+  --cid string
         Falcon Customer ID
-  -client-id string
+  --client-id string
         Client ID for accessing CrowdStrike Falcon Platform (default taken from FALCON_CLIENT_ID env)
-  -client-secret string
+  --client-secret string
         Client Secret for accessing CrowdStrike Falcon Platform (default taken from FALCON_CLIENT_SECRET)
-  -cloud string
+  --cloud string
         Falcon cloud abbreviation (us-1, us-2, eu-1, us-gov-1)
-  -enable-logging
+  --enable-logging
         Output logs to file /tmp/falcon/falcon-installer.log
-  -gpg-key string
-        Falcon GPG key to import
-  -member-cid string
+  --member-cid string
         Member CID for MSSP (for cases when OAuth2 authenticates multiple CIDs)
-  -provisioning-token string
+  --provisioning-token string
         The provisioning token to use for installing the sensor
-  -quiet
+  --quiet
         Supress all log output
-  -sensor-update-policy string
+  --sensor-update-policy string
         The sensor update policy name to use for sensor installation
-  -tags string
+  --tags string
         A comma seperated list of tags for sensor grouping.
-  -tmpdir string
+  --tmpdir string
         Temporary directory for downloading files (default "/tmp/falcon")
-  -user-agent string
+  --user-agent string
         User agent string to add to use for API requests in addition to the default
-  -verbose
+  --verbose
         Enable verbose output
-  -version
+  --version
         Print version information and exit
+```
+
+### Linux Specific Arguments
+Specific installer cli arguments for Linux
+
+```shell
+  --gpg-key string
+        Falcon GPG key to import
+```
+
+### Windows Specific Arguments
+Specific installer cli arguments for Windows
+
+```shell
+  --provisioning-wait-time int
+        The number of milliseconds to wait for the sensor to provision (default 1200000)
 ```
 
 ## Installation

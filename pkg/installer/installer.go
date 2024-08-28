@@ -22,7 +22,7 @@ import (
 	"github.com/crowdstrike/gofalcon/falcon/models"
 )
 
-const falconInstallDir = "/opt/CrowdStrike"
+const falconLinuxInstallDir = "/opt/CrowdStrike"
 
 var (
 	enterpriseLinux     = []string{"rhel", "centos", "oracle", "almalinux", "rocky"}
@@ -37,28 +37,49 @@ var (
 )
 
 type FalconSensorCLI struct {
-	CID               string
-	APD               string
-	APH               string
-	APP               string
-	Tags              string
+	// CID is the customer ID for the sensor to use when communicating with CrowdStrike.
+	CID string
+	// APD is the proxy disable flag for the sensor to use when communicating with CrowdStrike.
+	APD string
+	// APH is the proxy host for the sensor to use when communicating with CrowdStrike.
+	APH string
+	// APP is the proxy port for the sensor to use when communicating with CrowdStrike.
+	APP string
+	// Tags is a comma separated list of tags for sensor grouping.
+	Tags string
+	// ProvisioningToken is the token used to provision the sensor. If not provided, the API will attempt to retrieve a token.
 	ProvisioningToken string
+	// ProvisioningWaitTime is the time in milliseconds to wait for the sensor to provision. Windows only.
+	ProvisioningWaitTime int64
 }
 
 type FalconInstaller struct {
-	ClientId               string
-	ClientSecret           string
-	MemberCID              string
-	Cloud                  string
+	// ClientId is the client ID for accessing CrowdStrike Falcon Platform.
+	ClientId string
+	// ClientSecret is the client secret for accessing CrowdStrike Falcon Platform.
+	ClientSecret string
+	// MemberCID is the member CID for MSSP (for cases when OAuth2 authenticates multiple CIDs).
+	MemberCID string
+	// Cloud is the Falcon cloud abbreviation (us-1, us-2, eu-1, us-gov-1). Defaults to autodiscover.
+	Cloud string
+	// SensorUpdatePolicyName is the sensor update policy name to use for sensor installation.
 	SensorUpdatePolicyName string
-	TmpDir                 string
-	Arch                   string
-	OS                     string
-	OsName                 string
-	OsVersion              string
-	GpgKeyFile             string
-	UserAgent              string
+	// TmpDir is the temporary directory to use for downloading the sensor.
+	TmpDir string
+	// Arch is the architecture to install the sensor on.
+	Arch string
+	// OS is the operating system to install the sensor on.
+	OS string
+	// OsName is the name of the OS to use when querying for the sensor.
+	OsName string
+	// OsVersion is the version of the OS to use when querying for the sensor.
+	OsVersion string
+	// GpgKeyFile is the path to the GPG key file to use for importing the key. Linux only.
+	GpgKeyFile string
+	// UserAgent is the user agent string to use when making API requests.
+	UserAgent string
 
+	// SensorConfig is the configuration for the Falcon sensor CLI args.
 	SensorConfig FalconSensorCLI
 }
 
@@ -514,18 +535,18 @@ func (fi FalconInstaller) installSensor(path string) {
 		}
 
 	case "windows":
-		stdout, stderr, err := utils.RunCmd(path, args)
+		stdout, stderr, err := utils.RunCmd(path, fi.falconArgs())
 		if err != nil {
-			log.Fatalf("Error running %s: %v, %s", path, err, string(stderr))
+			log.Fatalf("Error running %s: %v, stdout: %s, stderr: %s", path, err, string(stdout), string(stderr))
 		}
 
-		slog.Debug("Installing Falcon Sensor", string(stdout), string(stderr))
+		slog.Debug("Installing Falcon Sensor")
 	}
 }
 
 // configureLinuxSensor configures the Falcon sensor on Linux using falconctl command
 func configureLinuxSensor(args []string) error {
-	falconCtlCmd := fmt.Sprintf("%s%sfalconctl", falconInstallDir, string(os.PathSeparator))
+	falconCtlCmd := fmt.Sprintf("%s%sfalconctl", falconLinuxInstallDir, string(os.PathSeparator))
 	slog.Debug("Configuring Falcon sensor", "Command", falconCtlCmd, "Args", args)
 
 	if _, err := exec.LookPath(falconCtlCmd); err != nil {
