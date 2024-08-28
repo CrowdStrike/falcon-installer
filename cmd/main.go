@@ -20,8 +20,8 @@ var (
 	targetOS = "linux"
 	arch     = "x86_64"
 
-	defaultTmpDir = fmt.Sprintf("%s%s%s", os.TempDir(), string(os.PathSeparator), "falcon")
-	logFile       = fmt.Sprintf("%s%s%s", defaultTmpDir, string(os.PathSeparator), "falcon-installer.log")
+	defaultTmpDir = fmt.Sprint(os.TempDir(), string(os.PathSeparator), "falcon")
+	logFile       = fmt.Sprint(defaultTmpDir, string(os.PathSeparator), "falcon-installer.log")
 )
 
 func init() {
@@ -30,6 +30,8 @@ func init() {
 		targetOS = "linux"
 	case "windows":
 		targetOS = "windows"
+		defaultTmpDir = fmt.Sprint("C:\\Windows\\Temp", string(os.PathSeparator), "falcon")
+		logFile = fmt.Sprint(defaultTmpDir, string(os.PathSeparator), "falcon-installer.log")
 	default:
 		if targetOS == "darwin" {
 			targetOS = "macos"
@@ -57,6 +59,7 @@ func init() {
 
 func main() {
 	var gpgKeyFile *string
+	var falconProvisionWait *int64
 
 	// API CLI flags
 	clientId := flag.String("client-id", os.Getenv("FALCON_CLIENT_ID"), "Client ID for accessing CrowdStrike Falcon Platform (default taken from FALCON_CLIENT_ID env)")
@@ -84,6 +87,11 @@ func main() {
 	// Linux specific flags
 	if targetOS == "linux" && rpm.IsRpmInstalled() {
 		gpgKeyFile = flag.String("gpg-key", os.Getenv("FALCON_GPG_KEY"), "Falcon GPG key to import")
+	}
+
+	// Windows specific flags
+	if targetOS == "windows" {
+		falconProvisionWait = flag.Int64("provisioning-wait-time", 1200000, "The number of milliseconds to wait for the sensor to provision")
 	}
 
 	flag.Parse()
@@ -172,6 +180,10 @@ func main() {
 
 	if isFlag("gpg-key") {
 		fi.GpgKeyFile = *gpgKeyFile
+	}
+
+	if isFlag("provisioning-wait-time") {
+		fc.ProvisioningWaitTime = *falconProvisionWait
 	}
 
 	slog.Debug("Falcon installer options", "Cloud", fi.Cloud, "MemberCID", fi.MemberCID, "SensorUpdatePolicyName", fi.SensorUpdatePolicyName, "GpgKeyFile", fi.GpgKeyFile, "TmpDir", fi.TmpDir, "OsName", fi.OsName, "OsVersion", fi.OsVersion, "OS", fi.OS, "Arch", fi.Arch, "UserAgent", fi.UserAgent)
