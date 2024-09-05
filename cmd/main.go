@@ -70,7 +70,7 @@ func main() {
 	// Falcon sensor flags
 	falconCID := flag.String("cid", os.Getenv("FALCON_CID"), "Falcon Customer ID")
 	falconToken := flag.String("provisioning-token", os.Getenv("FALCON_PROVISIONING_TOKEN"), "The provisioning token to use for installing the sensor. If not provided, the API will attempt to retrieve a token")
-	falconTags := flag.String("tags", os.Getenv("FALCON_TAGS"), "A comma seperated list of tags for sensor grouping")
+	falconTags := flag.String("tags", os.Getenv("FALCON_TAGS"), "A comma separated list of tags for sensor grouping")
 	falconAPD := flag.String("apd", os.Getenv("FALCON_APD"), "Configures if the proxy should be enabled or disabled. By default, the proxy is enabled")
 	falconAPH := flag.String("aph", os.Getenv("FALCON_APH"), "The proxy host for the sensor to use when communicating with CrowdStrike")
 	falconAPP := flag.String("app", os.Getenv("FALCON_APP"), "The proxy port for the sensor to use when communicating with CrowdStrike")
@@ -80,7 +80,7 @@ func main() {
 	userAgentAdd := flag.String("user-agent", "", "User agent string to add to use for API requests in addition to the default")
 	tmpDir := flag.String("tmpdir", defaultTmpDir, "Temporary directory for downloading files")
 	verbose := flag.Bool("verbose", false, "Enable verbose output")
-	quiet := flag.Bool("quiet", false, "Supress all log output")
+	quiet := flag.Bool("quiet", false, "Suppress all log output")
 	enableLogging := flag.Bool("enable-logging", false, fmt.Sprintf("Output logs to file %s", logFile))
 	versionFlag := flag.Bool("version", false, "Print version information and exit")
 
@@ -159,6 +159,11 @@ func main() {
 		APH:               *falconAPH,
 		APP:               *falconAPP,
 	}
+
+	if targetOS == "windows" {
+		fc.ProvisioningWaitTime = *falconProvisionWait
+	}
+
 	slog.Debug("Falcon sensor CLI options", "CID", fc.CID, "ProvisioningToken", fc.ProvisioningToken, "Tags", fc.Tags, "APD", fc.APD, "APH", fc.APH, "APP", fc.APP)
 
 	fi := installer.FalconInstaller{
@@ -180,10 +185,6 @@ func main() {
 
 	if isFlag("gpg-key") {
 		fi.GpgKeyFile = *gpgKeyFile
-	}
-
-	if isFlag("provisioning-wait-time") {
-		fc.ProvisioningWaitTime = *falconProvisionWait
 	}
 
 	slog.Debug("Falcon installer options", "Cloud", fi.Cloud, "MemberCID", fi.MemberCID, "SensorUpdatePolicyName", fi.SensorUpdatePolicyName, "GpgKeyFile", fi.GpgKeyFile, "TmpDir", fi.TmpDir, "OsName", fi.OsName, "OsVersion", fi.OsVersion, "OS", fi.OS, "Arch", fi.Arch, "UserAgent", fi.UserAgent)

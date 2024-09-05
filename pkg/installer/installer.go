@@ -190,6 +190,10 @@ func (fi FalconInstaller) falconArgs() []string {
 		falconArgs = []string{"-sf"}
 	case "windows":
 		falconArgs = []string{"/install", "/quiet"}
+
+		if fi.SensorConfig.ProvisioningWaitTime != 0 {
+			falconArgs = append(falconArgs, fmt.Sprintf(" ProvWaitTime=%d", fi.SensorConfig.ProvisioningWaitTime))
+		}
 	}
 
 	if fi.SensorConfig.CID != "" {
