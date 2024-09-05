@@ -39,11 +39,11 @@ Usage of falcon-installer:
   --provisioning-token string
         The provisioning token to use for installing the sensor
   --quiet
-        Supress all log output
+        Suppress all log output
   --sensor-update-policy string
         The sensor update policy name to use for sensor installation
   --tags string
-        A comma seperated list of tags for sensor grouping.
+        A comma separated list of tags for sensor grouping.
   --tmpdir string
         Temporary directory for downloading files (default "/tmp/falcon")
   --user-agent string
