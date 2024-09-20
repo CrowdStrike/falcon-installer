@@ -136,6 +136,11 @@ func main() {
 		*updatePolicyName = "platform_default"
 	}
 
+	// Handle short name for gov cloud until SDK supports it
+	if *cloud == "gov1" {
+		*cloud = "us-gov-1"
+	}
+
 	osName, osVersion, err := osutils.ReadEtcRelease(targetOS)
 	if err != nil {
 		log.Fatalf("%v", err)
