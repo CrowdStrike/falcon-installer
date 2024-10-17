@@ -38,7 +38,7 @@ func FalconInstalled(targetOS string) (bool, error) {
 // RunningWithPrivileges checks if the program is running with root/admin privileges
 func RunningWithPrivileges(targetOS string) (bool, error) {
 	switch targetOS {
-	case "linux":
+	case "linux", "macos":
 		user := os.Getuid()
 		if user != 0 {
 			return false, fmt.Errorf("You must run this program as root")
