@@ -325,6 +325,11 @@ func (fi FalconInstaller) getSensorUpdatePolicies(client *client.CrowdStrikeAPIS
 		csPlatformName = "Linux"
 	}
 
+	// Set default sensor update policy name if not provided
+	if fi.SensorUpdatePolicyName == "" {
+		fi.SensorUpdatePolicyName = "platform_default"
+	}
+
 	f := fmt.Sprintf("platform_name:~\"%s\"+name.raw:\"%s\"", csPlatformName, fi.SensorUpdatePolicyName)
 	slog.Debug("Sensor Update Policy Query", slog.String("Filter", f))
 	filter = &f

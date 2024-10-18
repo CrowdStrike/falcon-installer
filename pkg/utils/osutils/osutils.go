@@ -84,7 +84,7 @@ func ReadEtcRelease(targetOS string) (osName, osVersion string, err error) {
 	case "windows":
 		return "windows", "", nil
 	default:
-		return "", "", fmt.Errorf("Unsupported OS: %s", targetOS)
+		return "", "", fmt.Errorf("Unable to determine operating system. Unsupported OS: %s", targetOS)
 	}
 }
 
