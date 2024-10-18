@@ -1,14 +1,16 @@
 run:
   timeout: 5m
-enable:
+linters:
+  enable:
     - durationcheck
     - errcheck
-    - exportloopref
+    - copyloopvar
     - forcetypeassert
     - godot
     - gofmt
     - gosec
     - gosimple
+    - govet
     - ineffassign
     - makezero
     - misspell
@@ -19,4 +21,8 @@ enable:
     - unconvert
     - unparam
     - unused
-    - vet
+
+  linters-settings:
+  errcheck:
+    exclude-functions:
+      - cli.Execute

@@ -9,7 +9,7 @@ import (
 
 var systemctlCmd = "systemctl"
 
-// RestartService restarts a systemd service
+// RestartService restarts a systemd service.
 func RestartService(name string) error {
 	if systemctlCmd, err := exec.LookPath(systemctlCmd); err != nil {
 		return fmt.Errorf("Could not find systemctl: %s, %v", systemctlCmd, err)

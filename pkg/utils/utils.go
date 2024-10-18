@@ -44,7 +44,7 @@ func RunCmd(cmnd string, arg []string) ([]byte, []byte, error) {
 	return stdout.Bytes(), stderr.Bytes(), err
 }
 
-// OpenFileForWriting opens a file for writing, creating the directory if it doesn't exist
+// OpenFileForWriting opens a file for writing, creating the directory if it doesn't exist.
 func OpenFileForWriting(dir, filename string) (*os.File, error) {
 	if strings.Contains(filename, "/") {
 		return nil, fmt.Errorf("Refusing to download: '%s' includes '/' character", filename)

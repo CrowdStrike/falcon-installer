@@ -50,7 +50,7 @@ type FalconSensorCLI struct {
 	// ProvisioningToken is the token used to provision the sensor. If not provided, the API will attempt to retrieve a token.
 	ProvisioningToken string
 	// ProvisioningWaitTime is the time in milliseconds to wait for the sensor to provision. Windows only.
-	ProvisioningWaitTime int64
+	ProvisioningWaitTime uint64
 }
 
 type FalconInstaller struct {
@@ -181,7 +181,7 @@ func Run(fc FalconInstaller) {
 	slog.Info("Falcon sensor installation complete")
 }
 
-// falconArgs returns the arguments for the Falcon sensor installer based on the OS
+// falconArgs returns the arguments for the Falcon sensor installer based on the OS.
 func (fi FalconInstaller) falconArgs() []string {
 	falconArgs := []string{}
 
@@ -218,7 +218,7 @@ func (fi FalconInstaller) falconArgs() []string {
 	return falconArgs
 }
 
-// osArgHandler handles the formatting of arguments for the Falcon sensor installer based on the OS
+// osArgHandler handles the formatting of arguments for the Falcon sensor installer based on the OS.
 func (fi FalconInstaller) osArgHandler(arg, val string) string {
 	switch fi.OS {
 	case "windows":
@@ -234,7 +234,7 @@ func (fi FalconInstaller) osArgHandler(arg, val string) string {
 	}
 }
 
-// getSensorProvisioningToken queries the CrowdStrike API for the sensor provisioning token
+// getSensorProvisioningToken queries the CrowdStrike API for the sensor provisioning token.
 func (fi FalconInstaller) getSensorProvisioningToken(client *client.CrowdStrikeAPISpecification) string {
 	res, err := client.InstallationTokens.CustomerSettingsRead(
 		&installation_tokens.CustomerSettingsReadParams{
@@ -274,7 +274,7 @@ func (fi FalconInstaller) getSensorProvisioningToken(client *client.CrowdStrikeA
 	return token
 }
 
-// getTokenList queries the CrowdStrike API for the installation tokens
+// getTokenList queries the CrowdStrike API for the installation tokens.
 func (fi FalconInstaller) getTokenList(client *client.CrowdStrikeAPISpecification) []string {
 	res, err := client.InstallationTokens.TokensQuery(
 		&installation_tokens.TokensQueryParams{
@@ -293,7 +293,7 @@ func (fi FalconInstaller) getTokenList(client *client.CrowdStrikeAPISpecificatio
 	return payload.Resources
 }
 
-// getToken queries the CrowdStrike API for the installation token using the token ID
+// getToken queries the CrowdStrike API for the installation token using the token ID.
 func (fi FalconInstaller) getToken(client *client.CrowdStrikeAPISpecification, tokenList []string) string {
 	res, err := client.InstallationTokens.TokensRead(
 		&installation_tokens.TokensReadParams{
@@ -313,7 +313,7 @@ func (fi FalconInstaller) getToken(client *client.CrowdStrikeAPISpecification, t
 	return *payload.Resources[0].Value
 }
 
-// getSensorUpdatePolicies queries the CrowdStrike API for sensor update policies that match the provided policy name and architecture
+// getSensorUpdatePolicies queries the CrowdStrike API for sensor update policies that match the provided policy name and architecture.
 func (fi FalconInstaller) getSensorUpdatePolicies(client *client.CrowdStrikeAPISpecification) string {
 	var filter *string
 	csPlatformName := ""
@@ -381,7 +381,7 @@ func (fi FalconInstaller) getSensorUpdatePolicies(client *client.CrowdStrikeAPIS
 	return sensorVersion
 }
 
-// getSensors queries the CrowdStrike API for Falcon sensors that match the provided OS name, version, and architecture
+// getSensors queries the CrowdStrike API for Falcon sensors that match the provided OS name, version, and architecture.
 func (fi FalconInstaller) getSensors(client *client.CrowdStrikeAPISpecification) []*models.DomainSensorInstallerV2 {
 	var filter *string
 
@@ -430,7 +430,7 @@ func (fi FalconInstaller) getSensors(client *client.CrowdStrikeAPISpecification)
 	return payload.Resources[:k]
 }
 
-// querySuitableSensor queries the CrowdStrike API for a suitable Falcon sensor that matches the provided OS name, version, and architecture
+// querySuitableSensor queries the CrowdStrike API for a suitable Falcon sensor that matches the provided OS name, version, and architecture.
 func (fi FalconInstaller) querySuitableSensor(client *client.CrowdStrikeAPISpecification, sensorVersion string) *models.DomainSensorInstallerV2 {
 	for _, sensor := range fi.getSensors(client) {
 		if strings.Contains(*sensor.OsVersion, fi.OsVersion) {
@@ -443,7 +443,7 @@ func (fi FalconInstaller) querySuitableSensor(client *client.CrowdStrikeAPISpeci
 	return nil
 }
 
-// getCID gets the Falcon CID from the CrowdStrike API using the SensorDownload API
+// getCID gets the Falcon CID from the CrowdStrike API using the SensorDownload API.
 func (fi FalconInstaller) getCID(ctx context.Context, client *client.CrowdStrikeAPISpecification) (string, error) {
 	response, err := client.SensorDownload.GetSensorInstallersCCIDByQuery(&sensor_download.GetSensorInstallersCCIDByQueryParams{
 		Context: ctx,
@@ -462,7 +462,7 @@ func (fi FalconInstaller) getCID(ctx context.Context, client *client.CrowdStrike
 
 }
 
-// download downloads the Falcon sensor installer using the CrowdStrike API and saves it to the provided directory
+// download downloads the Falcon sensor installer using the CrowdStrike API and saves it to the provided directory.
 func (fi FalconInstaller) download(client *client.CrowdStrikeAPISpecification, sensor *models.DomainSensorInstallerV2, dir, filename string) string {
 	file, err := utils.OpenFileForWriting(dir, filename)
 	if err != nil {
@@ -487,7 +487,7 @@ func (fi FalconInstaller) download(client *client.CrowdStrikeAPISpecification, s
 	return fullPath
 }
 
-// installSensor installs the Falcon sensor using the appropriate package manager
+// installSensor installs the Falcon sensor using the appropriate package manager.
 func (fi FalconInstaller) installSensor(path string) {
 	c := ""
 	env := ""
@@ -553,7 +553,7 @@ func (fi FalconInstaller) installSensor(path string) {
 	}
 }
 
-// configureLinuxSensor configures the Falcon sensor on Linux using falconctl command
+// configureLinuxSensor configures the Falcon sensor on Linux using falconctl command.
 func configureLinuxSensor(args []string) error {
 	falconCtlCmd := fmt.Sprintf("%s%sfalconctl", falconLinuxInstallDir, string(os.PathSeparator))
 	slog.Debug("Configuring Falcon sensor", "Command", falconCtlCmd, "Args", args)
