@@ -11,7 +11,7 @@ import (
 	"github.com/crowdstrike/falcon-installer/pkg/utils"
 )
 
-// FalconInstalled checks if the Falcon Sensor is installed on the target OS
+// FalconInstalled checks if the Falcon Sensor is installed on the target OS.
 func FalconInstalled(targetOS string) (bool, error) {
 	falconInstalled := false
 
@@ -35,7 +35,7 @@ func FalconInstalled(targetOS string) (bool, error) {
 	return falconInstalled, fmt.Errorf("Unable to determine if Falcon Sensor is installed and running. Unsupported OS: %s", targetOS)
 }
 
-// RunningWithPrivileges checks if the program is running with root/admin privileges
+// RunningWithPrivileges checks if the program is running with root/admin privileges.
 func RunningWithPrivileges(targetOS string) (bool, error) {
 	switch targetOS {
 	case "linux", "macos":
@@ -56,13 +56,13 @@ func RunningWithPrivileges(targetOS string) (bool, error) {
 	return false, fmt.Errorf("Cannot check if running as a privileged user. Unsupported OS: %s", targetOS)
 }
 
-// IsWindowsAdmin checks if the user is running as an Administrator on Windows
+// IsWindowsAdmin checks if the user is running as an Administrator on Windows.
 func isWindowsAdmin() bool {
 	_, err := os.Open("\\\\.\\PHYSICALDRIVE0")
 	return err == nil
 }
 
-// ReadEtcRelease reads the /etc/os-release file on Linux and returns the OS name and version
+// ReadEtcRelease reads the /etc/os-release file on Linux and returns the OS name and version.
 func ReadEtcRelease(targetOS string) (osName, osVersion string, err error) {
 	switch targetOS {
 	case "linux":
@@ -88,7 +88,7 @@ func ReadEtcRelease(targetOS string) (osName, osVersion string, err error) {
 	}
 }
 
-// packageManagerQuery queries the linux package manager for the presence of a package
+// packageManagerQuery queries the linux package manager for the presence of a package.
 func packageManagerQuery(name string) (bool, error) {
 	if rpm.IsRpmInstalled() {
 		pkg, err := rpm.Query(name)
@@ -107,7 +107,7 @@ func packageManagerQuery(name string) (bool, error) {
 	return false, fmt.Errorf("Unsupported package manager for package query")
 }
 
-// scQuery queries the Windows service manager for the presence of a service
+// scQuery queries the Windows service manager for the presence of a service.
 func scQuery(name string) (bool, error) {
 	var err error
 	cmd, err := exec.LookPath("sc.exe")
