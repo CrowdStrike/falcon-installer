@@ -21,8 +21,3 @@ linters:
     - unconvert
     - unparam
     - unused
-
-  linters-settings:
-  errcheck:
-    exclude-functions:
-      - cli.Execute
