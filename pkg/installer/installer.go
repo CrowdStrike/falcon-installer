@@ -49,8 +49,14 @@ type FalconSensorCLI struct {
 	Tags string
 	// ProvisioningToken is the token used to provision the sensor. If not provided, the API will attempt to retrieve a token.
 	ProvisioningToken string
+	// NoProvisioningWait allows the Windows installer more provisioning time when communicating with CrowdStrike. Windows only.
+	NoProvisioningWait bool
 	// ProvisioningWaitTime is the time in milliseconds to wait for the sensor to provision. Windows only.
 	ProvisioningWaitTime uint64
+	// PACURL is the proxy auto-config URL for the sensor to use when communicating with CrowdStrike.
+	PACURL string
+	// NoRestart skips restarting the system after sensor installation. Windows only.
+	NoRestart bool
 }
 
 type FalconInstaller struct {
@@ -191,8 +197,20 @@ func (fi FalconInstaller) falconArgs() []string {
 	case "windows":
 		falconArgs = []string{"/install", "/quiet"}
 
+		if fi.SensorConfig.NoRestart {
+			falconArgs = append(falconArgs, "/norestart")
+		}
+
 		if fi.SensorConfig.ProvisioningWaitTime != 0 {
-			falconArgs = append(falconArgs, fmt.Sprintf(" ProvWaitTime=%d", fi.SensorConfig.ProvisioningWaitTime))
+			falconArgs = append(falconArgs, fmt.Sprintf("ProvWaitTime=%d", fi.SensorConfig.ProvisioningWaitTime))
+		}
+
+		if fi.SensorConfig.NoProvisioningWait {
+			falconArgs = append(falconArgs, "ProvNoWait=1")
+		}
+
+		if fi.SensorConfig.PACURL != "" {
+			falconArgs = append(falconArgs, fmt.Sprintf("PACURL=%s", fi.SensorConfig.PACURL))
 		}
 	}
 
