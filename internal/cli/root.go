@@ -129,6 +129,9 @@ func rootCmd() *cobra.Command {
 	// Windows sensor flags
 	if targetOS == "windows" {
 		winFlag := pflag.NewFlagSet("Windows", pflag.ExitOnError)
+		winFlag.BoolVar(&fc.NoRestart, "no-restart", false, "Do not restart the system after sensor installation")
+		winFlag.StringVar(&fc.PACURL, "pac-url", "", "Configure a proxy connection using the URL of a PAC file when communicating with CrowdStrike")
+		winFlag.BoolVar(&fc.NoProvisioningWait, "no-provisioning-wait", false, "Allows the Windows installer more provisioning time")
 		winFlag.Uint64Var(&fc.ProvisioningWaitTime, "provisioning-wait-time", 1200000, "The number of milliseconds to wait for the sensor to provision")
 		rootCmd.Flags().AddFlagSet(winFlag)
 		err = viper.BindPFlags(winFlag)
@@ -256,6 +259,7 @@ func Run(cmd *cobra.Command, args []string) {
 	fi.OS = targetOS
 	fi.OsName = osName
 	fi.OsVersion = osVersion
+	fi.SensorConfig = fc
 
 	slog.Debug("Falcon sensor CLI options", "CID", fc.CID, "ProvisioningToken", fc.ProvisioningToken, "Tags", fc.Tags, "APD", fc.APD, "APH", fc.APH, "APP", fc.APP)
 	slog.Debug("Falcon installer options", "Cloud", fi.Cloud, "MemberCID", fi.MemberCID, "SensorUpdatePolicyName", fi.SensorUpdatePolicyName, "GpgKeyFile", fi.GpgKeyFile, "TmpDir", fi.TmpDir, "OsName", fi.OsName, "OsVersion", fi.OsVersion, "OS", fi.OS, "Arch", fi.Arch, "UserAgent", fi.UserAgent)
@@ -277,7 +281,7 @@ func inputValidation(input, pattern string) error {
 
 // usageTemplate is a modified version of the default usage template.
 var usageTemplate = `Usage:{{if .Runnable}}
-  {{.UseLine}}{{end}}{{if .HasAvailableSubCommands}}
+  {{.Name}} [flags]{{end}}{{if .HasAvailableSubCommands}}
   {{.CommandPath}} [command]{{end}}{{if gt (len .Aliases) 0}}
 
 Aliases:
