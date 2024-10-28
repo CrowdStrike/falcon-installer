@@ -1,14 +1,12 @@
 package cli
 
 import (
-	"context"
 	"fmt"
 	"io"
 	"log"
 	"log/slog"
 	"maps"
 	"os"
-	"path"
 	"regexp"
 	"runtime"
 	"slices"
@@ -23,7 +21,7 @@ import (
 )
 
 var (
-	progName   = path.Base(os.Args[0])
+	progName   = "falcon-installer"
 	cliVersion = fmt.Sprintf("%s %s <commit: %s>", progName, version.Version, version.Commit)
 	targetOS   = "linux"
 	arch       = "x86_64"
@@ -85,7 +83,6 @@ func rootCmd() *cobra.Command {
 	// Falcon API flags
 	apiFlag := pflag.NewFlagSet("FalconAPI", pflag.ExitOnError)
 	apiFlag.StringVar(&fi.ClientId, "client-id", "", "Client ID for accessing CrowdStrike Falcon Platform")
-
 	apiFlag.StringVar(&fi.ClientSecret, "client-secret", "", "Client Secret for accessing CrowdStrike Falcon Platform")
 	apiFlag.StringVar(&fi.MemberCID, "member-cid", "", "Member CID for MSSP (for cases when OAuth2 authenticates multiple CIDs)")
 	apiFlag.StringVar(&fi.Cloud, "cloud", "autodiscover", "Falcon cloud abbreviation (e.g. us-1, us-2, eu-1, us-gov-1)")
@@ -129,9 +126,9 @@ func rootCmd() *cobra.Command {
 	// Windows sensor flags
 	if targetOS == "windows" {
 		winFlag := pflag.NewFlagSet("Windows", pflag.ExitOnError)
-		winFlag.BoolVar(&fc.NoRestart, "no-restart", false, "Do not restart the system after sensor installation")
+		winFlag.BoolVar(&fc.Restart, "restart", false, "Allow the system to restart after sensor installation if necessary")
 		winFlag.StringVar(&fc.PACURL, "pac-url", "", "Configure a proxy connection using the URL of a PAC file when communicating with CrowdStrike")
-		winFlag.BoolVar(&fc.NoProvisioningWait, "no-provisioning-wait", false, "Allows the Windows installer more provisioning time")
+		winFlag.BoolVar(&fc.DisableProvisioningWait, "disable-provisioning-wait", false, "Disabling allows the Windows installer more provisioning time")
 		winFlag.Uint64Var(&fc.ProvisioningWaitTime, "provisioning-wait-time", 1200000, "The number of milliseconds to wait for the sensor to provision")
 		rootCmd.Flags().AddFlagSet(winFlag)
 		err = viper.BindPFlags(winFlag)
@@ -155,7 +152,9 @@ func preRunConfig(cmd *cobra.Command, args []string) {
 	}
 
 	viper.SetEnvPrefix("FALCON")
+	viper.SetEnvKeyReplacer(strings.NewReplacer("-", "_"))
 	viper.AutomaticEnv()
+	bindCobraFlags(cmd)
 
 	verbose := cmd.Flags().Changed("verbose")
 	quiet := cmd.Flags().Changed("quiet")
@@ -281,7 +280,7 @@ func inputValidation(input, pattern string) error {
 
 // usageTemplate is a modified version of the default usage template.
 var usageTemplate = `Usage:{{if .Runnable}}
-  {{.Name}} [flags]{{end}}{{if .HasAvailableSubCommands}}
+  {{.UseLine}}{{end}}{{if .HasAvailableSubCommands}}
   {{.CommandPath}} [command]{{end}}{{if gt (len .Aliases) 0}}
 
 Aliases:
@@ -342,7 +341,22 @@ func groupUsageFunc(c *cobra.Command, groups map[string]*pflag.FlagSet) string {
 	return strings.TrimSpace(usage)
 }
 
+// bindCobraFlags binds the viper config values to the cobra flags.
+func bindCobraFlags(cmd *cobra.Command) {
+	viper := viper.GetViper()
+
+	cmd.Flags().VisitAll(func(f *pflag.Flag) {
+		// Apply the viper config value to the flag when the flag is not set and viper has a value
+		if !f.Changed && viper.IsSet(f.Name) {
+			val := viper.Get(f.Name)
+			if err := cmd.Flags().Set(f.Name, fmt.Sprintf("%v", val)); err != nil {
+				log.Fatalf("Error setting flag %s: %v", f.Name, err)
+			}
+		}
+	})
+}
+
 // Execute runs the root command.
 func Execute() error {
-	return rootCmd().ExecuteContext(context.Background())
+	return rootCmd().Execute()
 }
