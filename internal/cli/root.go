@@ -1,14 +1,12 @@
 package cli
 
 import (
-	"context"
 	"fmt"
 	"io"
 	"log"
 	"log/slog"
 	"maps"
 	"os"
-	"path"
 	"regexp"
 	"runtime"
 	"slices"
@@ -23,7 +21,7 @@ import (
 )
 
 var (
-	progName   = path.Base(os.Args[0])
+	progName   = "falcon-installer"
 	cliVersion = fmt.Sprintf("%s %s <commit: %s>", progName, version.Version, version.Commit)
 	targetOS   = "linux"
 	arch       = "x86_64"
@@ -154,7 +152,9 @@ func preRunConfig(cmd *cobra.Command, args []string) {
 	}
 
 	viper.SetEnvPrefix("FALCON")
+	viper.SetEnvKeyReplacer(strings.NewReplacer("-", "_"))
 	viper.AutomaticEnv()
+	bindCobraFlags(cmd)
 
 	verbose := cmd.Flags().Changed("verbose")
 	quiet := cmd.Flags().Changed("quiet")
@@ -280,7 +280,7 @@ func inputValidation(input, pattern string) error {
 
 // usageTemplate is a modified version of the default usage template.
 var usageTemplate = `Usage:{{if .Runnable}}
-  {{.Name}} [flags]{{end}}{{if .HasAvailableSubCommands}}
+  {{.UseLine}}{{end}}{{if .HasAvailableSubCommands}}
   {{.CommandPath}} [command]{{end}}{{if gt (len .Aliases) 0}}
 
 Aliases:
@@ -341,7 +341,22 @@ func groupUsageFunc(c *cobra.Command, groups map[string]*pflag.FlagSet) string {
 	return strings.TrimSpace(usage)
 }
 
+// bindCobraFlags binds the viper config values to the cobra flags.
+func bindCobraFlags(cmd *cobra.Command) {
+	viper := viper.GetViper()
+
+	cmd.Flags().VisitAll(func(f *pflag.Flag) {
+		// Apply the viper config value to the flag when the flag is not set and viper has a value
+		if !f.Changed && viper.IsSet(f.Name) {
+			val := viper.Get(f.Name)
+			if err := cmd.Flags().Set(f.Name, fmt.Sprintf("%v", val)); err != nil {
+				log.Fatalf("Error setting flag %s: %v", f.Name, err)
+			}
+		}
+	})
+}
+
 // Execute runs the root command.
 func Execute() error {
-	return rootCmd().ExecuteContext(context.Background())
+	return rootCmd().Execute()
 }
