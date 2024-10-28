@@ -177,14 +177,8 @@ func Run(fc FalconInstaller) {
 
 		// Restart Falcon sensor service if it was installed
 		if !falconInstalled {
-			if fc.OsName == "ubuntu" && fc.OsVersion == "14" {
-				if _, _, err := utils.RunCmd("service", []string{"falcon-sensor", "restart"}); err != nil {
-					log.Fatalf("Error restarting Falcon sensor service: %v", err)
-				}
-			} else {
-				if err := systemd.RestartService("falcon-sensor"); err != nil {
-					log.Fatalf("Error restarting Falcon sensor service: %v", err)
-				}
+			if err := systemd.RestartService("falcon-sensor"); err != nil {
+				log.Fatalf("Error restarting Falcon sensor service: %v", err)
 			}
 		}
 	}
@@ -529,15 +523,8 @@ func (fi FalconInstaller) installSensor(path string) {
 			args = []string{"install", "--quiet", "-y", path}
 		} else if cmd, err := exec.LookPath("/usr/bin/apt-get"); err == nil {
 			c = cmd
-
-			if fi.OsVersion != "14" {
-				args = []string{"install", "-y", path}
-				env = "DEBIAN_FRONTEND=noninteractive"
-			} else {
-				args = []string{"-i", path}
-				env = "DEBIAN_FRONTEND=noninteractive"
-				c = "/usr/bin/dpkg"
-			}
+			args = []string{"install", "-y", path}
+			env = "DEBIAN_FRONTEND=noninteractive"
 		} else if cmd, err := exec.LookPath("/usr/bin/dpkg"); err == nil {
 			c = cmd
 			args = []string{"install", "--qq", "-y", path}
@@ -552,20 +539,6 @@ func (fi FalconInstaller) installSensor(path string) {
 		}
 
 		slog.Debug("Installing Falcon Sensor", string(stdout), string(stderr))
-
-		// Remove when we no longer support Ubuntu 14
-		if fi.OsVersion == "14" {
-			args = []string{"-qq", "install", "-f", "-y"}
-			env = "DEBIAN_FRONTEND=noninteractive"
-
-			_, stderr, err := utils.RunCmdWithEnv("/usr/bin/apt-get", env, args)
-			if err != nil {
-				log.Fatalf("Error running dpkg: %v, %s", err, string(stderr))
-			}
-
-			slog.Debug("Installing dependencies for Ubuntu 14.04", string(stdout), string(stderr))
-		}
-
 	case "windows":
 		stdout, stderr, err := utils.RunCmd(path, fi.falconArgs())
 		if err != nil {
