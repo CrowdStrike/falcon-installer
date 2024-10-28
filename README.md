@@ -17,57 +17,49 @@ Ensure the following API scopes are enabled:
 ## Usage
 
 ```shell
-Usage of falcon-installer:
-  --apd string
-        Configures if the proxy should be enabled or disabled, By default, the proxy is enabled.
-  --aph string
-        The proxy host for the sensor to use when communicating with CrowdStrike
-  --app string
-        The proxy port for the sensor to use when communicating with CrowdStrike
-  --cid string
-        Falcon Customer ID
-  --client-id string
-        Client ID for accessing CrowdStrike Falcon Platform (default taken from FALCON_CLIENT_ID env)
-  --client-secret string
-        Client Secret for accessing CrowdStrike Falcon Platform (default taken from FALCON_CLIENT_SECRET)
-  --cloud string
-        Falcon cloud abbreviation (us-1, us-2, eu-1, us-gov-1)
-  --enable-logging
-        Output logs to file /tmp/falcon/falcon-installer.log
-  --member-cid string
-        Member CID for MSSP (for cases when OAuth2 authenticates multiple CIDs)
-  --provisioning-token string
-        The provisioning token to use for installing the sensor
-  --quiet
-        Suppress all log output
-  --sensor-update-policy string
-        The sensor update policy name to use for sensor installation
-  --tags string
-        A comma separated list of tags for sensor grouping.
-  --tmpdir string
-        Temporary directory for downloading files (default "/tmp/falcon")
-  --user-agent string
-        User agent string to add to use for API requests in addition to the default
-  --verbose
-        Enable verbose output
-  --version
-        Print version information and exit
+Usage:
+  falcon-installer [flags]
+
+Flags:
+      --enable-file-logging   Output logs to file
+  -h, --help                  Print usage information
+      --quiet                 Suppress all log output
+      --tmpdir string         Temporary directory for downloading files (default "/tmp/falcon")
+      --verbose               Enable verbose output
+  -v, --version               Print version information
+
+Falcon API Flags:
+      --client-id string              Client ID for accessing CrowdStrike Falcon Platform
+      --client-secret string          Client Secret for accessing CrowdStrike Falcon Platform
+      --cloud string                  Falcon cloud abbreviation (e.g. us-1, us-2, eu-1, us-gov-1) (default "autodiscover")
+      --member-cid string             Member CID for MSSP (for cases when OAuth2 authenticates multiple CIDs)
+      --sensor-update-policy string   The sensor update policy name to use for sensor installation (default "platform_default")
+      --user-agent string             User agent string to append to use for API requests
+
+Falcon Sensor Flags:
+      --cid string                  Falcon Customer ID. Optional when OAuth2 token is provided
+      --disable-proxy string        Configures if the proxy should be enabled or disabled. By default, the proxy is enabled
+      --provisioning-token string   The provisioning token to use for installing the sensor. If not provided, the API will attempt to retrieve a token
+      --proxy-host string           The proxy host for the sensor to use when communicating with CrowdStrike
+      --proxy-port string           The proxy port for the sensor to use when communicating with CrowdStrike
+      --tags string                 A comma separated list of tags for sensor grouping
 ```
 
 ### Linux Specific Arguments
-Specific installer cli arguments for Linux
 
 ```shell
-  --gpg-key string
-        Falcon GPG key to import
+Linux Installation Flags:
+      --gpg-key string   Falcon GPG key to import
 ```
 
 ### Windows Specific Arguments
-Specific installer cli arguments for Windows
 
 ```shell
-  --provisioning-wait-time int
-        The number of milliseconds to wait for the sensor to provision (default 1200000)
+Windows Installation Flags:
+      --disable-provisioning-wait     Disabling allows the Windows installer more provisioning time
+      --pac-url string                Configure a proxy connection using the URL of a PAC file when communicating with CrowdStrike
+      --provisioning-wait-time uint   The number of milliseconds to wait for the sensor to provision (default 1200000)
+      --restart                       Allow the system to restart after sensor installation if necessary
 ```
 
 ## Installation
