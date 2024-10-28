@@ -85,7 +85,6 @@ func rootCmd() *cobra.Command {
 	// Falcon API flags
 	apiFlag := pflag.NewFlagSet("FalconAPI", pflag.ExitOnError)
 	apiFlag.StringVar(&fi.ClientId, "client-id", "", "Client ID for accessing CrowdStrike Falcon Platform")
-
 	apiFlag.StringVar(&fi.ClientSecret, "client-secret", "", "Client Secret for accessing CrowdStrike Falcon Platform")
 	apiFlag.StringVar(&fi.MemberCID, "member-cid", "", "Member CID for MSSP (for cases when OAuth2 authenticates multiple CIDs)")
 	apiFlag.StringVar(&fi.Cloud, "cloud", "autodiscover", "Falcon cloud abbreviation (e.g. us-1, us-2, eu-1, us-gov-1)")
@@ -129,9 +128,9 @@ func rootCmd() *cobra.Command {
 	// Windows sensor flags
 	if targetOS == "windows" {
 		winFlag := pflag.NewFlagSet("Windows", pflag.ExitOnError)
-		winFlag.BoolVar(&fc.NoRestart, "no-restart", false, "Do not restart the system after sensor installation")
+		winFlag.BoolVar(&fc.Restart, "restart", false, "Allow the system to restart after sensor installation if necessary")
 		winFlag.StringVar(&fc.PACURL, "pac-url", "", "Configure a proxy connection using the URL of a PAC file when communicating with CrowdStrike")
-		winFlag.BoolVar(&fc.NoProvisioningWait, "no-provisioning-wait", false, "Allows the Windows installer more provisioning time")
+		winFlag.BoolVar(&fc.DisableProvisioningWait, "disable-provisioning-wait", false, "Disabling allows the Windows installer more provisioning time")
 		winFlag.Uint64Var(&fc.ProvisioningWaitTime, "provisioning-wait-time", 1200000, "The number of milliseconds to wait for the sensor to provision")
 		rootCmd.Flags().AddFlagSet(winFlag)
 		err = viper.BindPFlags(winFlag)

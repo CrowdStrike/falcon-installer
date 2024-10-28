@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/crowdstrike/falcon-installer/pkg/rpm"
 	"github.com/crowdstrike/falcon-installer/pkg/systemd"
@@ -49,14 +50,14 @@ type FalconSensorCLI struct {
 	Tags string
 	// ProvisioningToken is the token used to provision the sensor. If not provided, the API will attempt to retrieve a token.
 	ProvisioningToken string
-	// NoProvisioningWait allows the Windows installer more provisioning time when communicating with CrowdStrike. Windows only.
-	NoProvisioningWait bool
+	// DisableProvisioningWait allows the Windows installer more provisioning time when communicating with CrowdStrike. Windows only.
+	DisableProvisioningWait bool
 	// ProvisioningWaitTime is the time in milliseconds to wait for the sensor to provision. Windows only.
 	ProvisioningWaitTime uint64
 	// PACURL is the proxy auto-config URL for the sensor to use when communicating with CrowdStrike.
 	PACURL string
-	// NoRestart skips restarting the system after sensor installation. Windows only.
-	NoRestart bool
+	// Restart will allow the system to restart if necessary after sensor installation. Windows only.
+	Restart bool
 }
 
 type FalconInstaller struct {
@@ -109,6 +110,7 @@ func Run(fc FalconInstaller) {
 
 	falconArgs := fc.falconArgs()
 
+	// Get the provisioning token from the API if not provided
 	if fc.SensorConfig.ProvisioningToken == "" {
 		fc.SensorConfig.ProvisioningToken = fc.getSensorProvisioningToken(client)
 		if fc.SensorConfig.ProvisioningToken != "" {
@@ -139,6 +141,7 @@ func Run(fc FalconInstaller) {
 
 		}
 
+		// Get the Falcon CID from the API if not provided
 		if fc.SensorConfig.CID == "" {
 			fc.SensorConfig.CID, err = fc.getCID(context.Background(), client)
 			if err != nil {
@@ -148,11 +151,13 @@ func Run(fc FalconInstaller) {
 			falconArgs = append(falconArgs, fc.osArgHandler("cid", fc.SensorConfig.CID))
 		}
 
+		// Query the CrowdStrike API for a suitable Falcon sensor
 		sensor := fc.querySuitableSensor(client, "latest")
 		if sensor == nil {
 			log.Fatalf("Could not find Falcon sensor for '%s' '%s'", fc.OsName, fc.OsVersion)
 		}
 
+		// Download the Falcon sensor installer from the CrowdStrike API
 		path := fc.download(client, sensor, fc.TmpDir, *sensor.Name)
 
 		slog.Info("Starting Falcon sensor installation")
@@ -197,7 +202,7 @@ func (fi FalconInstaller) falconArgs() []string {
 	case "windows":
 		falconArgs = []string{"/install", "/quiet"}
 
-		if fi.SensorConfig.NoRestart {
+		if !fi.SensorConfig.Restart {
 			falconArgs = append(falconArgs, "/norestart")
 		}
 
@@ -205,7 +210,7 @@ func (fi FalconInstaller) falconArgs() []string {
 			falconArgs = append(falconArgs, fmt.Sprintf("ProvWaitTime=%d", fi.SensorConfig.ProvisioningWaitTime))
 		}
 
-		if fi.SensorConfig.NoProvisioningWait {
+		if fi.SensorConfig.DisableProvisioningWait {
 			falconArgs = append(falconArgs, "ProvNoWait=1")
 		}
 
@@ -541,9 +546,9 @@ func (fi FalconInstaller) installSensor(path string) {
 			log.Fatalf("Unable to find expected linux package manager. Unsupported package manager: %v", err)
 		}
 
-		stdout, stderr, err := utils.RunCmdWithEnv(c, env, args)
+		stdout, stderr, err := installSensorWithRetry(c, env, args)
 		if err != nil {
-			log.Fatalf("Error running %s: %v, %s", c, err, string(stderr))
+			log.Fatalf("Error running %s: %v, stdout: %s, stderr: %s", c, err, string(stdout), string(stderr))
 		}
 
 		slog.Debug("Installing Falcon Sensor", string(stdout), string(stderr))
@@ -569,6 +574,28 @@ func (fi FalconInstaller) installSensor(path string) {
 
 		slog.Debug("Installing Falcon Sensor")
 	}
+}
+
+// installSensorWithRetry attempts to install the sensor every 5 seconds for 2 minutes.
+func installSensorWithRetry(c string, env string, args []string) ([]byte, []byte, error) {
+	const maxRetries = 24
+	const retryInterval = 5 * time.Second
+
+	for i := 0; i < maxRetries; i++ {
+		stdout, stderr, err := utils.RunCmdWithEnv(c, env, args)
+		if err == nil {
+			return stdout, stderr, nil
+		}
+
+		if strings.Contains(string(stderr), "E: Could not get lock") {
+			slog.Warn("Package lock detected. Waiting before retrying sensor installation", "Attempt", i+1, "RetryInterval", retryInterval)
+			time.Sleep(retryInterval)
+		} else {
+			return stdout, stderr, err
+		}
+	}
+
+	return nil, nil, fmt.Errorf("Error running %s: exceeded maximum retries: %d, stderr: %s", c, maxRetries, "Could not install the sensor")
 }
 
 // configureLinuxSensor configures the Falcon sensor on Linux using falconctl command.
