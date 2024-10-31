@@ -9,6 +9,13 @@ import (
 	"strings"
 )
 
+func BoolToInt(b bool) uint8 {
+	if b {
+		return 1
+	}
+	return 0
+}
+
 func RunCmdWithEnv(cmnd string, env string, arg []string) ([]byte, []byte, error) {
 	var stdout, stderr bytes.Buffer
 	c := exec.Command(cmnd, arg...)

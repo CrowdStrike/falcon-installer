@@ -101,9 +101,9 @@ func rootCmd() *cobra.Command {
 	falconFlag.StringVar(&fc.ProvisioningToken, "provisioning-token", "",
 		"The provisioning token to use for installing the sensor. If not provided, the API will attempt to retrieve a token")
 	falconFlag.StringVar(&fc.Tags, "tags", "", "A comma separated list of tags for sensor grouping")
-	falconFlag.StringVar(&fc.APD, "disable-proxy", "", "Configures if the proxy should be enabled or disabled. By default, the proxy is enabled")
-	falconFlag.StringVar(&fc.APH, "proxy-host", "", "The proxy host for the sensor to use when communicating with CrowdStrike")
-	falconFlag.StringVar(&fc.APP, "proxy-port", "", "The proxy port for the sensor to use when communicating with CrowdStrike")
+	falconFlag.BoolVar(&fc.ProxyDisable, "disable-proxy", false, "Disable the sensor proxy settings")
+	falconFlag.StringVar(&fc.ProxyHost, "proxy-host", "", "The proxy host for the sensor to use when communicating with CrowdStrike")
+	falconFlag.StringVar(&fc.ProxyPort, "proxy-port", "", "The proxy port for the sensor to use when communicating with CrowdStrike")
 	rootCmd.Flags().AddFlagSet(falconFlag)
 	err = viper.BindPFlags(falconFlag)
 	if err != nil {
@@ -234,6 +234,10 @@ func preRunValidation(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("Invalid Falcon Sensor tag format: %v", err)
 	}
 
+	if fc.ProxyDisable && (fc.ProxyHost != "" || fc.ProxyPort != "") {
+		return fmt.Errorf("Cannot specify proxy host or port when using --disable-proxy")
+	}
+
 	return nil
 }
 
@@ -260,8 +264,8 @@ func Run(cmd *cobra.Command, args []string) {
 	fi.OsVersion = osVersion
 	fi.SensorConfig = fc
 
-	slog.Debug("Falcon sensor CLI options", "CID", fc.CID, "ProvisioningToken", fc.ProvisioningToken, "Tags", fc.Tags, "APD", fc.APD, "APH", fc.APH, "APP", fc.APP)
-	slog.Debug("Falcon installer options", "Cloud", fi.Cloud, "MemberCID", fi.MemberCID, "SensorUpdatePolicyName", fi.SensorUpdatePolicyName, "GpgKeyFile", fi.GpgKeyFile, "TmpDir", fi.TmpDir, "OsName", fi.OsName, "OsVersion", fi.OsVersion, "OS", fi.OS, "Arch", fi.Arch, "UserAgent", fi.UserAgent)
+	slog.Debug("Falcon sensor CLI options", "CID", fc.CID, "ProvisioningToken", fc.ProvisioningToken, "Tags", fc.Tags, "DisableProxy", fc.ProxyDisable, "ProxyHost", fc.ProxyHost, "ProxyPort", fc.ProxyPort)
+	slog.Debug("Falcon installer options", "Cloud", fi.Cloud, "MemberCID", fi.MemberCID, "SensorUpdatePolicyName", fi.SensorUpdatePolicyName, "GpgKeyFile", fi.GpgKeyFile, "TmpDir", fi.TmpDir, "OsName", fi.OsName, "OsVersion", fi.OsVersion, "OS", fi.OS, "Arch", fi.Arch)
 
 	installer.Run(fi)
 }

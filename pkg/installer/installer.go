@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -40,12 +41,12 @@ var (
 type FalconSensorCLI struct {
 	// CID is the customer ID for the sensor to use when communicating with CrowdStrike.
 	CID string
-	// APD is the proxy disable flag for the sensor to use when communicating with CrowdStrike.
-	APD string
-	// APH is the proxy host for the sensor to use when communicating with CrowdStrike.
-	APH string
-	// APP is the proxy port for the sensor to use when communicating with CrowdStrike.
-	APP string
+	// ProxyDisable will disable the sensor's proxy settings.
+	ProxyDisable bool
+	// ProxyHost is the proxy host for the sensor to use when communicating with CrowdStrike.
+	ProxyHost string
+	// ProxyPort is the proxy port for the sensor to use when communicating with CrowdStrike.
+	ProxyPort string
 	// Tags is a comma separated list of tags for sensor grouping.
 	Tags string
 	// ProvisioningToken is the token used to provision the sensor. If not provided, the API will attempt to retrieve a token.
@@ -216,20 +217,42 @@ func (fi FalconInstaller) falconArgs() []string {
 	if fi.SensorConfig.CID != "" {
 		falconArgs = append(falconArgs, fi.osArgHandler("cid", fi.SensorConfig.CID))
 	}
+
 	if fi.SensorConfig.ProvisioningToken != "" {
 		falconArgs = append(falconArgs, fi.osArgHandler("provisioning-token", fi.SensorConfig.ProvisioningToken))
 	}
+
 	if fi.SensorConfig.Tags != "" {
 		falconArgs = append(falconArgs, fi.osArgHandler("tags", fi.SensorConfig.Tags))
 	}
-	if fi.SensorConfig.APD != "" {
-		falconArgs = append(falconArgs, fi.osArgHandler("apd", fi.SensorConfig.APD))
+
+	if fi.SensorConfig.ProxyDisable || fi.SensorConfig.ProxyHost != "" || fi.SensorConfig.ProxyPort != "" {
+		// apd = "true" for Linux, PROXYDISABLE=1 for Windows, default is empty to use the sensor's default setting.
+		// For Windows, PROXYDISABLE=0 is not needed because the default is to have the proxy enabled.
+		// For Linux, the default is to have the proxy unset.
+		val := ""
+
+		switch fi.OS {
+		case "windows":
+			// Windows default is to have the proxy enabled.
+			if fi.SensorConfig.ProxyDisable {
+				val = fmt.Sprintf("%d", utils.BoolToInt(fi.SensorConfig.ProxyDisable))
+			}
+		case "linux":
+			val = strconv.FormatBool(fi.SensorConfig.ProxyDisable)
+		}
+
+		if val != "" {
+			falconArgs = append(falconArgs, fi.osArgHandler("apd", val))
+		}
 	}
-	if fi.SensorConfig.APH != "" {
-		falconArgs = append(falconArgs, fi.osArgHandler("aph", fi.SensorConfig.APH))
+
+	if fi.SensorConfig.ProxyHost != "" {
+		falconArgs = append(falconArgs, fi.osArgHandler("aph", fi.SensorConfig.ProxyHost))
 	}
-	if fi.SensorConfig.APP != "" {
-		falconArgs = append(falconArgs, fi.osArgHandler("app", fi.SensorConfig.APP))
+
+	if fi.SensorConfig.ProxyPort != "" {
+		falconArgs = append(falconArgs, fi.osArgHandler("app", fi.SensorConfig.ProxyPort))
 	}
 
 	return falconArgs
@@ -239,12 +262,6 @@ func (fi FalconInstaller) falconArgs() []string {
 func (fi FalconInstaller) osArgHandler(arg, val string) string {
 	switch fi.OS {
 	case "windows":
-		if fi.SensorConfig.APD == "true" {
-			val = "1"
-		} else if fi.SensorConfig.APD == "false" {
-			val = "0"
-		}
-
 		return fmt.Sprintf("%s=%s", windowsFalconArgMap[arg], val)
 	default:
 		return fmt.Sprintf("--%s=%s", arg, val)

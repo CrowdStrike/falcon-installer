@@ -38,7 +38,7 @@ Falcon API Flags:
 
 Falcon Sensor Flags:
       --cid string                  Falcon Customer ID. Optional when OAuth2 token is provided
-      --disable-proxy string        Configures if the proxy should be enabled or disabled. By default, the proxy is enabled
+      --disable-proxy               Disable the sensor proxy settings
       --provisioning-token string   The provisioning token to use for installing the sensor. If not provided, the API will attempt to retrieve a token
       --proxy-host string           The proxy host for the sensor to use when communicating with CrowdStrike
       --proxy-port string           The proxy port for the sensor to use when communicating with CrowdStrike
