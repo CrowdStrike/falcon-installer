@@ -11,6 +11,8 @@ import (
 	"github.com/crowdstrike/falcon-installer/pkg/utils"
 )
 
+var scQueryCmnd = "sc.exe"
+
 // FalconInstalled checks if the Falcon Sensor is installed on the target OS.
 func FalconInstalled(targetOS string) (bool, error) {
 	falconInstalled := false
@@ -110,7 +112,7 @@ func packageManagerQuery(name string) (bool, error) {
 // scQuery queries the Windows service manager for the presence of a service.
 func scQuery(name string) (bool, error) {
 	var err error
-	cmd, err := exec.LookPath("sc.exe")
+	cmd, err := exec.LookPath(scQueryCmnd)
 	if err != nil {
 		return false, fmt.Errorf("Unable to find sc.exe: %v", err)
 	}

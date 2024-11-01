@@ -8,7 +8,7 @@ import (
 	"github.com/crowdstrike/falcon-installer/pkg/utils"
 )
 
-const rpmCmd = "/usr/bin/rpm"
+var rpmCmd = "/usr/bin/rpm"
 
 // Query checks if a package is installed e.g. `rpm -q <package>`.
 func Query(name string) (bool, error) {

@@ -8,7 +8,7 @@ import (
 	"github.com/crowdstrike/falcon-installer/pkg/utils"
 )
 
-const dpkgCmd = "/usr/bin/dpkg"
+var dpkgCmd = "/usr/bin/dpkg"
 
 // IsDpkgInstalled checks if the dpkg command is installed.
 func IsDpkgInstalled() bool {
