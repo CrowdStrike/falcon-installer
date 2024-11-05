@@ -49,7 +49,8 @@ Falcon Sensor Flags:
 
 ```shell
 Linux Installation Flags:
-      --gpg-key string   Falcon GPG key to import
+      --configure-image   Configure the sensor for use in an image
+      --gpg-key string    Falcon GPG key to import
 ```
 
 ### Windows Specific Arguments
@@ -57,9 +58,11 @@ Linux Installation Flags:
 ```shell
 Windows Installation Flags:
       --disable-provisioning-wait     Disabling allows the Windows installer more provisioning time
+      --disable-start                 Prevent the sensor from starting after installation until a reboot occurs
       --pac-url string                Configure a proxy connection using the URL of a PAC file when communicating with CrowdStrike
       --provisioning-wait-time uint   The number of milliseconds to wait for the sensor to provision (default 1200000)
       --restart                       Allow the system to restart after sensor installation if necessary
+      --vdi                           Enable virtual desktop infrastructure mode
 ```
 
 ## Installation

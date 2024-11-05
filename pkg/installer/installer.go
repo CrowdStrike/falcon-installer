@@ -55,10 +55,14 @@ type FalconSensorCLI struct {
 	DisableProvisioningWait bool
 	// ProvisioningWaitTime is the time in milliseconds to wait for the sensor to provision. Windows only.
 	ProvisioningWaitTime uint64
-	// PACURL is the proxy auto-config URL for the sensor to use when communicating with CrowdStrike.
+	// PACURL is the proxy auto-config URL for the sensor to use when communicating with CrowdStrike. Windows only.
 	PACURL string
 	// Restart will allow the system to restart if necessary after sensor installation. Windows only.
 	Restart bool
+	// NoStart will prevent the sensor from starting after installation until a reboot occurs. Windows only.
+	NoStart bool
+	// VDI will enable virtual desktop infrastructure mode. Windows only.
+	VDI bool
 }
 
 type FalconInstaller struct {
@@ -86,6 +90,8 @@ type FalconInstaller struct {
 	GpgKeyFile string
 	// UserAgent is the user agent string to use when making API requests.
 	UserAgent string
+	// ConfigureImage will configure the sensor on the image. Linux only.
+	ConfigureImage bool
 
 	// SensorConfig is the configuration for the Falcon sensor CLI args.
 	SensorConfig FalconSensorCLI
@@ -185,6 +191,14 @@ func Run(fc FalconInstaller) {
 	}
 
 	slog.Info("Falcon sensor installation complete")
+
+	if fc.OS == "linux" && fc.ConfigureImage {
+		slog.Info("Configuring Falcon sensor for the image")
+		if err := fc.configureLinuxSensorImage(); err != nil {
+			log.Fatalf("Error configuring Falcon sensor for the image: %v", err)
+		}
+		slog.Info("Sensor configuration for the image is complete")
+	}
 }
 
 // falconArgs returns the arguments for the Falcon sensor installer based on the OS.
@@ -207,6 +221,14 @@ func (fi FalconInstaller) falconArgs() []string {
 
 		if fi.SensorConfig.DisableProvisioningWait {
 			falconArgs = append(falconArgs, "ProvNoWait=1")
+		}
+
+		if fi.SensorConfig.NoStart {
+			falconArgs = append(falconArgs, "NoStart=1")
+		}
+
+		if fi.SensorConfig.VDI {
+			falconArgs = append(falconArgs, "VDI=1")
 		}
 
 		if fi.SensorConfig.PACURL != "" {
@@ -599,6 +621,67 @@ func configureLinuxSensor(args []string) error {
 
 	if _, stderr, err := utils.RunCmd(falconCtlCmd, args); err != nil {
 		return fmt.Errorf("Error running falconctl: %v, stderr: %s", err, string(stderr))
+	}
+
+	return nil
+}
+
+// getSensorSettings using the sensor command line interface.
+func getSensorSettings(args []string) (string, error) {
+	falconCtlCmd := fmt.Sprintf("%s%sfalconctl", falconLinuxInstallDir, string(os.PathSeparator))
+	slog.Debug("Getting sensor settings", "Command", falconCtlCmd, "Args", args)
+
+	if _, err := exec.LookPath(falconCtlCmd); err != nil {
+		return "", fmt.Errorf("Could not find falconctl: %s: %v", falconCtlCmd, err)
+	}
+
+	stdout, stderr, err := utils.RunCmd(falconCtlCmd, args)
+	if err != nil {
+		return "", fmt.Errorf("Error running falconctl: %v, stderr: %s", err, string(stderr))
+	}
+
+	return string(stdout), nil
+}
+
+// configureLinuxSensorImage configures the Falcon sensor on the image.
+func (fi FalconInstaller) configureLinuxSensorImage() error {
+	var err error
+	const maxRetries = 24
+	const retryInterval = 5 * time.Second
+	aid := []string{"-g", "--aid"}
+	val := ""
+
+	for i := 0; i < maxRetries; i++ {
+		if val, err = getSensorSettings(aid); err != nil {
+			return fmt.Errorf("Error retrieving Falcon sensor settings: %v", err)
+		}
+
+		if strings.Contains(val, "aid is not set.") {
+			slog.Warn("Sensor has not return an AID yet. Retrying...", "Attempt", i+1, "RetryInterval", retryInterval)
+			time.Sleep(retryInterval)
+		} else {
+			break
+		}
+
+		if i == maxRetries-1 {
+			return fmt.Errorf("Sensor has not returned an AID")
+		}
+	}
+
+	// Remove the aid
+	slog.Debug("Removing the aid from the sensor configuration")
+	delAid := []string{"-d", "-f", "--aid"}
+	if err := configureLinuxSensor(delAid); err != nil {
+		return fmt.Errorf("Error configuring Falcon sensor: %v", err)
+	}
+
+	// re-add the provisioning token if it was used
+	if fi.SensorConfig.ProvisioningToken != "" {
+		slog.Debug("Re-adding provisioning token")
+		token := []string{"-s", "-f", fmt.Sprintf("--provisioning-token=%s", fi.SensorConfig.ProvisioningToken)}
+		if err := configureLinuxSensor(token); err != nil {
+			return fmt.Errorf("Error configuring Falcon sensor: %v", err)
+		}
 	}
 
 	return nil

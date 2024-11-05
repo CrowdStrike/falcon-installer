@@ -115,6 +115,7 @@ func rootCmd() *cobra.Command {
 	if targetOS == "linux" {
 		linuxFlag := pflag.NewFlagSet("Linux", pflag.ExitOnError)
 		linuxFlag.StringVar(&fi.GpgKeyFile, "gpg-key", "", "Falcon GPG key to import")
+		linuxFlag.BoolVar(&fi.ConfigureImage, "configure-image", false, "Configure the sensor for use in an image")
 		rootCmd.Flags().AddFlagSet(linuxFlag)
 		err = viper.BindPFlags(linuxFlag)
 		if err != nil {
@@ -130,6 +131,8 @@ func rootCmd() *cobra.Command {
 		winFlag.StringVar(&fc.PACURL, "pac-url", "", "Configure a proxy connection using the URL of a PAC file when communicating with CrowdStrike")
 		winFlag.BoolVar(&fc.DisableProvisioningWait, "disable-provisioning-wait", false, "Disabling allows the Windows installer more provisioning time")
 		winFlag.Uint64Var(&fc.ProvisioningWaitTime, "provisioning-wait-time", 1200000, "The number of milliseconds to wait for the sensor to provision")
+		winFlag.BoolVar(&fc.NoStart, "disable-start", false, "Prevent the sensor from starting after installation until a reboot occurs")
+		winFlag.BoolVar(&fc.VDI, "vdi", false, "Enable virtual desktop infrastructure mode")
 		rootCmd.Flags().AddFlagSet(winFlag)
 		err = viper.BindPFlags(winFlag)
 		if err != nil {
