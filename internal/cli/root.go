@@ -219,6 +219,10 @@ func preRunConfig(cmd *cobra.Command, args []string) {
 func preRunValidation(cmd *cobra.Command, args []string) error {
 	viper := viper.GetViper()
 
+	// Silence usage if an error occurs since the usage string does not provide additional information
+	// on why the command failed.
+	cmd.SilenceUsage = true
+
 	if !cmd.Flags().Changed("client-id") && !viper.IsSet("client_id") {
 		return fmt.Errorf("Client ID must be specified. See https://falcon.crowdstrike.com/api-clients-and-keys/clients to create or update OAuth2 credentials.")
 	}
@@ -235,11 +239,11 @@ func preRunValidation(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("Client Secret cannot be empty")
 	}
 
-	if err := inputValidation(viper.GetString("client_id"), "^[a-zA-Z0-9]{32}$"); err != nil {
+	if err := inputValidation(viper.GetString("client-id"), "^[a-zA-Z0-9]{32}$"); err != nil {
 		return fmt.Errorf("Invalid OAuth Client ID format: %v", err)
 	}
 
-	if err := inputValidation(viper.GetString("client_secret"), "^[a-zA-Z0-9]{40}$"); err != nil {
+	if err := inputValidation(viper.GetString("client-secret"), "^[a-zA-Z0-9]{40}$"); err != nil {
 		return fmt.Errorf("Invalid OAuth Client Secret format: %v", err)
 	}
 
