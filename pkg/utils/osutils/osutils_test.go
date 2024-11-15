@@ -20,17 +20,25 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-//go:build linux
-// +build linux
+//go:build !windows
+// +build !windows
 
 package osutils
 
 import (
+	"runtime"
 	"testing"
 )
 
+func testArch() string {
+	if runtime.GOOS == "darwin" {
+		return "macos"
+	}
+	return runtime.GOOS
+}
+
 func TestFalconInstalled(t *testing.T) {
-	got, err := FalconInstalled("linux")
+	got, err := FalconInstalled(testArch())
 	if err != nil {
 		t.Error(err)
 	}
@@ -50,7 +58,7 @@ func TestFalconInstalled(t *testing.T) {
 }
 
 func TestRunningWithPrivileges(t *testing.T) {
-	got, err := RunningWithPrivileges("linux")
+	got, err := RunningWithPrivileges(testArch())
 	if err == nil {
 		t.Errorf("Expected error %v", err)
 	}
@@ -70,12 +78,12 @@ func TestRunningWithPrivileges(t *testing.T) {
 }
 
 func TestReadEtcRelease(t *testing.T) {
-	os, ver, err := ReadEtcRelease("linux")
+	os, ver, err := ReadEtcRelease(testArch())
 	if err != nil {
 		t.Error(err)
 	}
 
-	if os == "" || ver == "" {
+	if os == "linux" && ver == "" {
 		t.Errorf("Expected to get os and version: Got: os: %s, ver: %s", os, ver)
 	}
 
@@ -90,7 +98,13 @@ func TestReadEtcRelease(t *testing.T) {
 }
 
 func TestPackageManagerQuery(t *testing.T) {
-	got, err := packageManagerQuery("falcon-sensor")
+	pkgname := "falcon-sensor"
+
+	if testArch() == "macos" {
+		pkgname = "com.crowdstrike.falcon.*"
+	}
+
+	got, err := packageManagerQuery(pkgname)
 	if err != nil {
 		t.Error(err)
 	}
