@@ -37,7 +37,7 @@ Falcon API Flags:
       --user-agent string             User agent string to append to use for API requests
 
 Falcon Sensor Flags:
-      --cid string                  Falcon Customer ID. Optional when OAuth2 token is provided
+      --cid string                  Falcon Customer ID. Optional when OAuth2 credentials are provided
       --disable-proxy               Disable the sensor proxy settings
       --provisioning-token string   The provisioning token to use for installing the sensor. If not provided, the API will attempt to retrieve a token
       --proxy-host string           The proxy host for the sensor to use when communicating with CrowdStrike
@@ -49,7 +49,7 @@ Falcon Sensor Flags:
 
 ```shell
 Linux Installation Flags:
-      --configure-image   Configure the sensor for use in an image
+      --configure-image   Use when installing the sensor in an image
       --gpg-key string    Falcon GPG key to import
 ```
 
