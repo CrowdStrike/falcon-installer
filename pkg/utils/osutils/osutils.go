@@ -29,6 +29,7 @@ import (
 	"strings"
 
 	"github.com/crowdstrike/falcon-installer/pkg/dpkg"
+	"github.com/crowdstrike/falcon-installer/pkg/pkgutil"
 	"github.com/crowdstrike/falcon-installer/pkg/rpm"
 	"github.com/crowdstrike/falcon-installer/pkg/utils"
 )
@@ -38,10 +39,15 @@ var scQueryCmnd = "sc.exe"
 // FalconInstalled checks if the Falcon Sensor is installed on the target OS.
 func FalconInstalled(targetOS string) (bool, error) {
 	falconInstalled := false
+	pkgName := "falcon-sensor"
 
 	switch targetOS {
-	case "linux":
-		falconInstalled, err := packageManagerQuery("falcon-sensor")
+	case "linux", "macos":
+		if targetOS == "macos" {
+			pkgName = "com.crowdstrike.falcon.*"
+		}
+
+		falconInstalled, err := packageManagerQuery(pkgName)
 		if err != nil {
 			return falconInstalled, fmt.Errorf("Error querying package manager: %v", err)
 		}
@@ -107,6 +113,8 @@ func ReadEtcRelease(targetOS string) (osName, osVersion string, err error) {
 		return osName, osVersion, nil
 	case "windows":
 		return "windows", "", nil
+	case "macos":
+		return "macos", "", nil
 	default:
 		return "", "", fmt.Errorf("Unable to determine operating system. Unsupported OS: %s", targetOS)
 	}
@@ -114,14 +122,21 @@ func ReadEtcRelease(targetOS string) (osName, osVersion string, err error) {
 
 // packageManagerQuery queries the linux package manager for the presence of a package.
 func packageManagerQuery(name string) (bool, error) {
-	if rpm.IsRpmInstalled() {
+	switch {
+	case rpm.IsRpmInstalled():
 		pkg, err := rpm.Query(name)
 		if err != nil {
 			return false, err
 		}
 		return pkg, nil
-	} else if dpkg.IsDpkgInstalled() {
+	case dpkg.IsDpkgInstalled():
 		pkg, err := dpkg.Query(name)
+		if err != nil {
+			return false, err
+		}
+		return pkg, nil
+	case pkgutil.IsPkgUtilInstalled():
+		pkg, err := pkgutil.Query(name)
 		if err != nil {
 			return false, err
 		}
