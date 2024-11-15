@@ -335,6 +335,7 @@ func (fi FalconInstaller) installSensor(path string) {
 			log.Fatalf("Unable to find expected linux package manager. Unsupported package manager: %v", err)
 		}
 
+		slog.Debug("Install command being used for installation", "Command", c, "Args", args)
 		stdout, stderr, err := installSensorWithRetry(c, env, args)
 		if err != nil {
 			log.Fatalf("Error running %s: %v, stdout: %s, stderr: %s", c, err, string(stdout), string(stderr))

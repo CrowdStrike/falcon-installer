@@ -119,7 +119,7 @@ func rootCmd() *cobra.Command {
 
 	// Falcon sensor flags
 	falconFlag := pflag.NewFlagSet("Falcon", pflag.ExitOnError)
-	falconFlag.StringVar(&fc.CID, "cid", "", "Falcon Customer ID. Optional when OAuth2 token is provided")
+	falconFlag.StringVar(&fc.CID, "cid", "", "Falcon Customer ID. Optional when OAuth2 credentials are provided")
 	falconFlag.StringVar(&fc.ProvisioningToken, "provisioning-token", "",
 		"The provisioning token to use for installing the sensor. If not provided, the API will attempt to retrieve a token")
 	falconFlag.StringVar(&fc.Tags, "tags", "", "A comma separated list of tags for sensor grouping")
@@ -137,7 +137,7 @@ func rootCmd() *cobra.Command {
 	if targetOS == "linux" {
 		linuxFlag := pflag.NewFlagSet("Linux", pflag.ExitOnError)
 		linuxFlag.StringVar(&fi.GpgKeyFile, "gpg-key", "", "Falcon GPG key to import")
-		linuxFlag.BoolVar(&fi.ConfigureImage, "configure-image", false, "Configure the sensor for use in an image")
+		linuxFlag.BoolVar(&fi.ConfigureImage, "configure-image", false, "Use when installing the sensor in an image")
 		rootCmd.Flags().AddFlagSet(linuxFlag)
 		err = viper.BindPFlags(linuxFlag)
 		if err != nil {
@@ -224,11 +224,11 @@ func preRunValidation(cmd *cobra.Command, args []string) error {
 	cmd.SilenceUsage = true
 
 	if !cmd.Flags().Changed("client-id") && !viper.IsSet("client_id") {
-		return fmt.Errorf("Client ID must be specified. See https://falcon.crowdstrike.com/api-clients-and-keys/clients to create or update OAuth2 credentials.")
+		return fmt.Errorf("Client ID must be specified. See https://falcon.crowdstrike.com/api-clients-and-keys/clients to create or update OAuth2 credentials")
 	}
 
 	if !cmd.Flags().Changed("client-secret") && !viper.IsSet("client_secret") {
-		return fmt.Errorf("Client Secret must be specified. See https://falcon.crowdstrike.com/api-clients-and-keys/clients to create or update OAuth2 credentials.")
+		return fmt.Errorf("Client Secret must be specified. See https://falcon.crowdstrike.com/api-clients-and-keys/clients to create or update OAuth2 credentials")
 	}
 
 	if cmd.Flags().Changed("client-id") && viper.GetString("client-id") == "" {
