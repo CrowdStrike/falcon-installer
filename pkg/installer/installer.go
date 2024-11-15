@@ -29,27 +29,21 @@ import (
 	"log/slog"
 	"os"
 	"os/exec"
-	"slices"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/crowdstrike/falcon-installer/pkg/falcon"
 	"github.com/crowdstrike/falcon-installer/pkg/rpm"
 	"github.com/crowdstrike/falcon-installer/pkg/systemd"
 	"github.com/crowdstrike/falcon-installer/pkg/utils"
 	"github.com/crowdstrike/falcon-installer/pkg/utils/osutils"
-	"github.com/crowdstrike/gofalcon/falcon"
-	"github.com/crowdstrike/gofalcon/falcon/client"
-	"github.com/crowdstrike/gofalcon/falcon/client/installation_tokens"
-	"github.com/crowdstrike/gofalcon/falcon/client/sensor_download"
-	"github.com/crowdstrike/gofalcon/falcon/client/sensor_update_policies"
-	"github.com/crowdstrike/gofalcon/falcon/models"
+	gofalcon "github.com/crowdstrike/gofalcon/falcon"
 )
 
 const falconLinuxInstallDir = "/opt/CrowdStrike"
 
 var (
-	enterpriseLinux     = []string{"rhel", "centos", "oracle", "almalinux", "rocky"}
 	windowsFalconArgMap = map[string]string{
 		"cid":                "CID",
 		"provisioning-token": "ProvToken",
@@ -102,8 +96,8 @@ type FalconInstaller struct {
 	TmpDir string
 	// Arch is the architecture to install the sensor on.
 	Arch string
-	// OS is the operating system to install the sensor on.
-	OS string
+	// OSType is the type of operating system to install the sensor on e.g. linux, windows, macos, etc.
+	OSType string
 	// OsName is the name of the OS to use when querying for the sensor.
 	OsName string
 	// OsVersion is the version of the OS to use when querying for the sensor.
@@ -120,16 +114,16 @@ type FalconInstaller struct {
 }
 
 func Run(fc FalconInstaller) {
-	falconInstalled, err := osutils.FalconInstalled(fc.OS)
+	falconInstalled, err := osutils.FalconInstalled(fc.OSType)
 	if err != nil {
 		log.Fatalf("Error checking if Falcon sensor is installed: %v", err)
 	}
 
-	client, err := falcon.NewClient(&falcon.ApiConfig{
+	client, err := gofalcon.NewClient(&gofalcon.ApiConfig{
 		ClientId:          fc.ClientId,
 		ClientSecret:      fc.ClientSecret,
 		MemberCID:         fc.MemberCID,
-		Cloud:             falcon.Cloud(fc.Cloud),
+		Cloud:             gofalcon.Cloud(fc.Cloud),
 		Context:           context.Background(),
 		UserAgentOverride: fc.UserAgent,
 	})
@@ -141,7 +135,7 @@ func Run(fc FalconInstaller) {
 
 	// Get the provisioning token from the API if not provided
 	if fc.SensorConfig.ProvisioningToken == "" {
-		fc.SensorConfig.ProvisioningToken = fc.getSensorProvisioningToken(client)
+		fc.SensorConfig.ProvisioningToken = falcon.GetProvisioningToken(client)
 		if fc.SensorConfig.ProvisioningToken != "" {
 			falconArgs = append(falconArgs, fc.osArgHandler("provisioning-token", fc.SensorConfig.ProvisioningToken))
 		}
@@ -172,7 +166,7 @@ func Run(fc FalconInstaller) {
 
 		// Get the Falcon CID from the API if not provided
 		if fc.SensorConfig.CID == "" {
-			fc.SensorConfig.CID, err = fc.getCID(context.Background(), client)
+			fc.SensorConfig.CID, err = falcon.GetCID(context.Background(), client)
 			if err != nil {
 				log.Fatalf("Error getting Falcon CID: %v", err)
 			}
@@ -181,13 +175,13 @@ func Run(fc FalconInstaller) {
 		}
 
 		// Query the CrowdStrike API for a suitable Falcon sensor
-		sensor := fc.querySuitableSensor(client, "latest")
+		sensor := falcon.QuerySuitableSensor(client, fc.OsName, fc.OsVersion, fc.OSType, fc.Arch, fc.SensorUpdatePolicyName, "latest")
 		if sensor == nil {
 			log.Fatalf("Could not find Falcon sensor for '%s' '%s'", fc.OsName, fc.OsVersion)
 		}
 
 		// Download the Falcon sensor installer from the CrowdStrike API
-		path := fc.download(client, sensor, fc.TmpDir, *sensor.Name)
+		path := falcon.SensorDownload(client, sensor, fc.TmpDir, *sensor.Name)
 
 		slog.Info("Starting Falcon sensor installation")
 		fc.installSensor(path)
@@ -195,7 +189,7 @@ func Run(fc FalconInstaller) {
 		slog.Info("Sensor is already installed. Skipping download and installation")
 	}
 
-	if fc.OS == "linux" {
+	if fc.OSType == "linux" {
 		if len(falconArgs) > 1 {
 			if err := configureLinuxSensor(falconArgs); err != nil {
 				log.Fatalf("Error configuring Falcon sensor: %v", err)
@@ -214,7 +208,7 @@ func Run(fc FalconInstaller) {
 
 	slog.Info("Falcon sensor installation complete")
 
-	if fc.OS == "linux" && fc.ConfigureImage {
+	if fc.OSType == "linux" && fc.ConfigureImage {
 		slog.Info("Configuring Falcon sensor for the image")
 		if err := fc.configureLinuxSensorImage(); err != nil {
 			log.Fatalf("Error configuring Falcon sensor for the image: %v", err)
@@ -227,7 +221,7 @@ func Run(fc FalconInstaller) {
 func (fi FalconInstaller) falconArgs() []string {
 	falconArgs := []string{}
 
-	switch fi.OS {
+	switch fi.OSType {
 	case "linux":
 		falconArgs = []string{"-sf"}
 	case "windows":
@@ -276,7 +270,7 @@ func (fi FalconInstaller) falconArgs() []string {
 		// For Linux, the default is to have the proxy unset.
 		val := ""
 
-		switch fi.OS {
+		switch fi.OSType {
 		case "windows":
 			// Windows default is to have the proxy enabled.
 			if fi.SensorConfig.ProxyDisable {
@@ -304,265 +298,12 @@ func (fi FalconInstaller) falconArgs() []string {
 
 // osArgHandler handles the formatting of arguments for the Falcon sensor installer based on the OS.
 func (fi FalconInstaller) osArgHandler(arg, val string) string {
-	switch fi.OS {
+	switch fi.OSType {
 	case "windows":
 		return fmt.Sprintf("%s=%s", windowsFalconArgMap[arg], val)
 	default:
 		return fmt.Sprintf("--%s=%s", arg, val)
 	}
-}
-
-// getSensorProvisioningToken queries the CrowdStrike API for the sensor provisioning token.
-func (fi FalconInstaller) getSensorProvisioningToken(client *client.CrowdStrikeAPISpecification) string {
-	res, err := client.InstallationTokens.CustomerSettingsRead(
-		&installation_tokens.CustomerSettingsReadParams{
-			Context: context.Background(),
-		},
-	)
-	if err != nil {
-		errPayload := falcon.ErrorExtractPayload(err)
-		if errPayload == nil {
-			log.Fatal(falcon.ErrorExplain(err))
-		}
-
-		bytes, err := errPayload.MarshalBinary()
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		if strings.Contains(string(bytes), "\"code\":403,\"message\":\"access denied, authorization failed\"") {
-			slog.Warn("Skipping getting installation tokens because the OAuth scope does not have permission to read installation tokens. If you are using provisioning tokens, please provide the token via CLI or update the OAuth2 client with the `Installation Tokens: Read` scope.")
-			return ""
-		} else {
-			log.Fatal(falcon.ErrorExplain(err))
-		}
-	}
-
-	payload := res.GetPayload()
-	if err = falcon.AssertNoError(payload.Errors); err != nil {
-		log.Fatal(err)
-	}
-
-	token := ""
-	if payload.Resources[0].TokensRequired != nil && *payload.Resources[0].TokensRequired {
-		token = fi.getToken(client, fi.getTokenList(client))
-		slog.Debug("Found suitable Falcon installation token", "Token", token)
-	}
-
-	return token
-}
-
-// getTokenList queries the CrowdStrike API for the installation tokens.
-func (fi FalconInstaller) getTokenList(client *client.CrowdStrikeAPISpecification) []string {
-	res, err := client.InstallationTokens.TokensQuery(
-		&installation_tokens.TokensQueryParams{
-			Context: context.Background(),
-		},
-	)
-	if err != nil {
-		log.Fatal(falcon.ErrorExplain(err))
-	}
-
-	payload := res.GetPayload()
-	if err = falcon.AssertNoError(payload.Errors); err != nil {
-		log.Fatal(err)
-	}
-
-	return payload.Resources
-}
-
-// getToken queries the CrowdStrike API for the installation token using the token ID.
-func (fi FalconInstaller) getToken(client *client.CrowdStrikeAPISpecification, tokenList []string) string {
-	res, err := client.InstallationTokens.TokensRead(
-		&installation_tokens.TokensReadParams{
-			Context: context.Background(),
-			Ids:     tokenList,
-		},
-	)
-	if err != nil {
-		log.Fatal(falcon.ErrorExplain(err))
-	}
-
-	payload := res.GetPayload()
-	if err = falcon.AssertNoError(payload.Errors); err != nil {
-		log.Fatal(err)
-	}
-
-	return *payload.Resources[0].Value
-}
-
-// getSensorUpdatePolicies queries the CrowdStrike API for sensor update policies that match the provided policy name and architecture.
-func (fi FalconInstaller) getSensorUpdatePolicies(client *client.CrowdStrikeAPISpecification) string {
-	var filter *string
-	csPlatformName := ""
-
-	switch fi.OS {
-	case "windows":
-		csPlatformName = "windows"
-	default:
-		csPlatformName = "Linux"
-	}
-
-	// Set default sensor update policy name if not provided
-	if fi.SensorUpdatePolicyName == "" {
-		fi.SensorUpdatePolicyName = "platform_default"
-	}
-
-	f := fmt.Sprintf("platform_name:~\"%s\"+name.raw:\"%s\"", csPlatformName, fi.SensorUpdatePolicyName)
-	slog.Debug("Sensor Update Policy Query", slog.String("Filter", f))
-	filter = &f
-
-	res, err := client.SensorUpdatePolicies.QueryCombinedSensorUpdatePoliciesV2(
-		&sensor_update_policies.QueryCombinedSensorUpdatePoliciesV2Params{
-			Filter:  filter,
-			Context: context.Background(),
-		},
-	)
-	if err != nil {
-		log.Fatal(falcon.ErrorExplain(err))
-	}
-	payload := res.GetPayload()
-	if err = falcon.AssertNoError(payload.Errors); err != nil {
-		log.Fatal(err)
-	}
-
-	sensorVersion := ""
-	for _, policy := range payload.Resources {
-		if *policy.Enabled && *policy.Settings.Stage == "prod" {
-			switch fi.OS {
-			case "linux":
-				switch fi.Arch {
-				case "arm64":
-					for _, variant := range policy.Settings.Variants {
-						if strings.Contains(strings.ToLower(*variant.Platform), "arm64") {
-							sensorVersion = *variant.SensorVersion
-							slog.Debug("arm64 sensor update policy versions", "Version", sensorVersion)
-						}
-					}
-				case "s390x":
-					for _, variant := range policy.Settings.Variants {
-						if strings.Contains(strings.ToLower(*variant.Platform), "zlinux") {
-							sensorVersion = *variant.SensorVersion
-							slog.Debug("zLinux sensor update policy version", "Version", sensorVersion)
-						}
-					}
-				default:
-					sensorVersion = *policy.Settings.SensorVersion
-				}
-			default:
-				sensorVersion = *policy.Settings.SensorVersion
-			}
-		}
-	}
-
-	slog.Debug("Found suitable Falcon sensor version from sensor update policies", "Version", sensorVersion)
-	return sensorVersion
-}
-
-// getSensors queries the CrowdStrike API for Falcon sensors that match the provided OS name, version, and architecture.
-func (fi FalconInstaller) getSensors(client *client.CrowdStrikeAPISpecification) []*models.DomainSensorInstallerV2 {
-	var filter *string
-
-	// If the OS name is in the enterpriseLinux list, replace it with a wildcard
-	osName := fi.OsName
-
-	sensorVersion := fi.getSensorUpdatePolicies(client)
-	if osName != "" {
-		if slices.Contains(enterpriseLinux, strings.ToLower(osName)) {
-			slog.Debug("Adding wildcard for Enterprise Linux", "Distros", enterpriseLinux, "OS", osName, "Version", fi.OsVersion)
-			osName = "*RHEL*"
-		}
-
-		f := fmt.Sprintf("os:~\"%s\"+os_version:\"*%s*\"+architectures:\"%s\"", osName, fi.OsVersion, fi.Arch)
-		if sensorVersion != "" {
-			f = fmt.Sprintf("%s+version:\"%s\"", f, sensorVersion)
-		}
-		slog.Debug("Sensor Installer Query", slog.String("Filter", f))
-		filter = &f
-	}
-
-	res, err := client.SensorDownload.GetCombinedSensorInstallersByQueryV2(
-		&sensor_download.GetCombinedSensorInstallersByQueryV2Params{
-			Context: context.Background(),
-			Filter:  filter,
-		},
-	)
-	if err != nil {
-		log.Fatal(falcon.ErrorExplain(err))
-	}
-	payload := res.GetPayload()
-	if err = falcon.AssertNoError(payload.Errors); err != nil {
-		log.Fatal(err)
-	}
-
-	k := 0
-	for _, sensor := range payload.Resources {
-		slog.Debug(*sensor.Description)
-		if strings.Contains(*sensor.Description, "Falcon SIEM Connector") {
-			continue
-		}
-		payload.Resources[k] = sensor
-		k++
-	}
-
-	return payload.Resources[:k]
-}
-
-// querySuitableSensor queries the CrowdStrike API for a suitable Falcon sensor that matches the provided OS name, version, and architecture.
-func (fi FalconInstaller) querySuitableSensor(client *client.CrowdStrikeAPISpecification, sensorVersion string) *models.DomainSensorInstallerV2 {
-	for _, sensor := range fi.getSensors(client) {
-		if strings.Contains(*sensor.OsVersion, fi.OsVersion) {
-			if *sensor.Version == sensorVersion || sensorVersion == "latest" {
-				slog.Debug("Found suitable Falcon sensor", "Version", *sensor.Version)
-				return sensor
-			}
-		}
-	}
-	return nil
-}
-
-// getCID gets the Falcon CID from the CrowdStrike API using the SensorDownload API.
-func (fi FalconInstaller) getCID(ctx context.Context, client *client.CrowdStrikeAPISpecification) (string, error) {
-	response, err := client.SensorDownload.GetSensorInstallersCCIDByQuery(&sensor_download.GetSensorInstallersCCIDByQueryParams{
-		Context: ctx,
-	})
-	if err != nil {
-		return "", fmt.Errorf("Could not get Falcon CID from CrowdStrike Falcon API: %v", err)
-	}
-	payload := response.GetPayload()
-	if err = falcon.AssertNoError(payload.Errors); err != nil {
-		return "", fmt.Errorf("Error reported when getting Falcon CID from CrowdStrike Falcon API: %v", err)
-	}
-	if len(payload.Resources) != 1 {
-		return "", fmt.Errorf("Failed to get Falcon CID: Unexpected API response: %v", payload.Resources)
-	}
-	return payload.Resources[0], nil
-
-}
-
-// download downloads the Falcon sensor installer using the CrowdStrike API and saves it to the provided directory.
-func (fi FalconInstaller) download(client *client.CrowdStrikeAPISpecification, sensor *models.DomainSensorInstallerV2, dir, filename string) string {
-	file, err := utils.OpenFileForWriting(dir, filename)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	_, err = client.SensorDownload.DownloadSensorInstallerByIDV2(
-		&sensor_download.DownloadSensorInstallerByIDV2Params{
-			Context: context.Background(),
-			ID:      *sensor.Sha256,
-		}, file)
-	if err != nil {
-		log.Fatal(falcon.ErrorExplain(err))
-	}
-
-	if err := file.Close(); err != nil {
-		log.Fatal(err)
-	}
-
-	fullPath := fmt.Sprintf("%s%s%s", dir, string(os.PathSeparator), filename)
-	slog.Debug(fmt.Sprintf("Downloaded %s to %s", *sensor.Description, fullPath))
-	return fullPath
 }
 
 // installSensor installs the Falcon sensor using the appropriate package manager.
@@ -571,7 +312,7 @@ func (fi FalconInstaller) installSensor(path string) {
 	env := ""
 	args := []string{} //nolint:staticcheck
 
-	switch fi.OS {
+	switch fi.OSType {
 	case "linux":
 		if cmd, err := exec.LookPath("/usr/bin/dnf"); err == nil {
 			c = cmd
