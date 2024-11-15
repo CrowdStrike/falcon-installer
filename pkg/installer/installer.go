@@ -34,14 +34,13 @@ import (
 	"time"
 
 	"github.com/crowdstrike/falcon-installer/pkg/falcon"
+	"github.com/crowdstrike/falcon-installer/pkg/falcon/falconctl"
 	"github.com/crowdstrike/falcon-installer/pkg/rpm"
 	"github.com/crowdstrike/falcon-installer/pkg/systemd"
 	"github.com/crowdstrike/falcon-installer/pkg/utils"
 	"github.com/crowdstrike/falcon-installer/pkg/utils/osutils"
 	gofalcon "github.com/crowdstrike/gofalcon/falcon"
 )
-
-const falconLinuxInstallDir = "/opt/CrowdStrike"
 
 var (
 	windowsFalconArgMap = map[string]string{
@@ -191,7 +190,7 @@ func Run(fc FalconInstaller) {
 
 	if fc.OSType == "linux" {
 		if len(falconArgs) > 1 {
-			if err := configureLinuxSensor(falconArgs); err != nil {
+			if err := falconctl.Set(fc.OSType, falconArgs); err != nil {
 				log.Fatalf("Error configuring Falcon sensor: %v", err)
 			}
 		} else {
@@ -373,39 +372,6 @@ func installSensorWithRetry(c string, env string, args []string) ([]byte, []byte
 	return nil, nil, fmt.Errorf("Error running %s: exceeded maximum retries: %d, stderr: %s", c, maxRetries, "Could not install the sensor")
 }
 
-// configureLinuxSensor configures the Falcon sensor on Linux using falconctl command.
-func configureLinuxSensor(args []string) error {
-	falconCtlCmd := fmt.Sprintf("%s%sfalconctl", falconLinuxInstallDir, string(os.PathSeparator))
-	slog.Debug("Configuring Falcon sensor", "Command", falconCtlCmd, "Args", args)
-
-	if _, err := exec.LookPath(falconCtlCmd); err != nil {
-		return fmt.Errorf("Could not find falconctl: %s: %v", falconCtlCmd, err)
-	}
-
-	if _, stderr, err := utils.RunCmd(falconCtlCmd, args); err != nil {
-		return fmt.Errorf("Error running falconctl: %v, stderr: %s", err, string(stderr))
-	}
-
-	return nil
-}
-
-// getSensorSettings using the sensor command line interface.
-func getSensorSettings(args []string) (string, error) {
-	falconCtlCmd := fmt.Sprintf("%s%sfalconctl", falconLinuxInstallDir, string(os.PathSeparator))
-	slog.Debug("Getting sensor settings", "Command", falconCtlCmd, "Args", args)
-
-	if _, err := exec.LookPath(falconCtlCmd); err != nil {
-		return "", fmt.Errorf("Could not find falconctl: %s: %v", falconCtlCmd, err)
-	}
-
-	stdout, stderr, err := utils.RunCmd(falconCtlCmd, args)
-	if err != nil {
-		return "", fmt.Errorf("Error running falconctl: %v, stderr: %s", err, string(stderr))
-	}
-
-	return string(stdout), nil
-}
-
 // configureLinuxSensorImage configures the Falcon sensor on the image.
 func (fi FalconInstaller) configureLinuxSensorImage() error {
 	var err error
@@ -415,7 +381,7 @@ func (fi FalconInstaller) configureLinuxSensorImage() error {
 	val := ""
 
 	for i := 0; i < maxRetries; i++ {
-		if val, err = getSensorSettings(aid); err != nil {
+		if val, err = falconctl.Get(fi.OSType, aid); err != nil {
 			return fmt.Errorf("Error retrieving Falcon sensor settings: %v", err)
 		}
 
@@ -434,7 +400,7 @@ func (fi FalconInstaller) configureLinuxSensorImage() error {
 	// Remove the aid
 	slog.Debug("Removing the aid from the sensor configuration")
 	delAid := []string{"-d", "-f", "--aid"}
-	if err := configureLinuxSensor(delAid); err != nil {
+	if err := falconctl.Set(fi.OSType, delAid); err != nil {
 		return fmt.Errorf("Error configuring Falcon sensor: %v", err)
 	}
 
@@ -442,7 +408,7 @@ func (fi FalconInstaller) configureLinuxSensorImage() error {
 	if fi.SensorConfig.ProvisioningToken != "" {
 		slog.Debug("Re-adding provisioning token")
 		token := []string{"-s", "-f", fmt.Sprintf("--provisioning-token=%s", fi.SensorConfig.ProvisioningToken)}
-		if err := configureLinuxSensor(token); err != nil {
+		if err := falconctl.Set(fi.OSType, token); err != nil {
 			return fmt.Errorf("Error configuring Falcon sensor: %v", err)
 		}
 	}
