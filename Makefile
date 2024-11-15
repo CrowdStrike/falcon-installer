@@ -44,7 +44,7 @@ vet: ## Run go vet against code.
 test: fmt vet ## Run tests.
 	go test -v ./... -coverprofile cover.out
 
-.PHONY: lint
+.PHONY: license
 license: addlicense ## Run addlicense to add license to source code
 	$(ADDLICENSE) -c 'CrowdStrike, Inc.' -skip yaml -skip yml -s -f LICENSE $(shell pwd)
 
