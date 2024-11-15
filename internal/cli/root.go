@@ -288,13 +288,13 @@ func Run(cmd *cobra.Command, args []string) {
 	osVersion = strings.Split(osVersion, ".")[0]
 
 	fi.Arch = arch
-	fi.OS = targetOS
+	fi.OSType = targetOS
 	fi.OsName = osName
 	fi.OsVersion = osVersion
 	fi.SensorConfig = fc
 
 	slog.Debug("Falcon sensor CLI options", "CID", fc.CID, "ProvisioningToken", fc.ProvisioningToken, "Tags", fc.Tags, "DisableProxy", fc.ProxyDisable, "ProxyHost", fc.ProxyHost, "ProxyPort", fc.ProxyPort)
-	slog.Debug("Falcon installer options", "Cloud", fi.Cloud, "MemberCID", fi.MemberCID, "SensorUpdatePolicyName", fi.SensorUpdatePolicyName, "GpgKeyFile", fi.GpgKeyFile, "TmpDir", fi.TmpDir, "OsName", fi.OsName, "OsVersion", fi.OsVersion, "OS", fi.OS, "Arch", fi.Arch)
+	slog.Debug("Falcon installer options", "Cloud", fi.Cloud, "MemberCID", fi.MemberCID, "SensorUpdatePolicyName", fi.SensorUpdatePolicyName, "GpgKeyFile", fi.GpgKeyFile, "TmpDir", fi.TmpDir, "OsName", fi.OsName, "OsVersion", fi.OsVersion, "OS", fi.OSType, "Arch", fi.Arch)
 
 	installer.Run(fi)
 }
