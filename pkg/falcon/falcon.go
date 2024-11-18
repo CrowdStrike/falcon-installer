@@ -61,6 +61,28 @@ func GetCID(ctx context.Context, client *client.CrowdStrikeAPISpecification) (st
 
 }
 
+// GetMaintenanceToken queries the CrowdStrike API for the maintenance token.
+func GetMaintenanceToken(client *client.CrowdStrikeAPISpecification, aid string) string {
+	res, err := client.SensorUpdatePolicies.RevealUninstallToken(
+		&sensor_update_policies.RevealUninstallTokenParams{
+			Body: &models.UninstallTokenRevealUninstallTokenReqV1{
+				DeviceID: &aid,
+			},
+			Context: context.Background(),
+		},
+	)
+	if err != nil {
+		log.Fatal(falcon.ErrorExplain(err))
+	}
+
+	payload := res.GetPayload()
+	if err = falcon.AssertNoError(payload.Errors); err != nil {
+		log.Fatal(err)
+	}
+
+	return *payload.Resources[0].UninstallToken
+}
+
 // getToken queries the CrowdStrike API for the installation token using the token ID.
 func getToken(client *client.CrowdStrikeAPISpecification, tokenList []string) string {
 	res, err := client.InstallationTokens.TokensRead(
