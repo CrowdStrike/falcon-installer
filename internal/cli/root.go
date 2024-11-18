@@ -133,8 +133,9 @@ func rootCmd() *cobra.Command {
 	}
 	groups["Falcon Sensor Flags"] = falconFlag
 
-	// Linux sensor flags
-	if targetOS == "linux" {
+	switch targetOS {
+	case "linux":
+		// Linux sensor flags
 		linuxFlag := pflag.NewFlagSet("Linux", pflag.ExitOnError)
 		linuxFlag.StringVar(&fi.GpgKeyFile, "gpg-key", "", "Falcon GPG key to import")
 		linuxFlag.BoolVar(&fi.ConfigureImage, "configure-image", false, "Use when installing the sensor in an image")
@@ -144,10 +145,9 @@ func rootCmd() *cobra.Command {
 			log.Fatalf("Error binding linux flags: %v", err)
 		}
 		groups["Linux Installation Flags"] = linuxFlag
-	}
 
-	// Windows sensor flags
-	if targetOS == "windows" {
+	case "windows":
+		// Windows sensor flags
 		winFlag := pflag.NewFlagSet("Windows", pflag.ExitOnError)
 		winFlag.BoolVar(&fc.Restart, "restart", false, "Allow the system to restart after sensor installation if necessary")
 		winFlag.StringVar(&fc.PACURL, "pac-url", "", "Configure a proxy connection using the URL of a PAC file when communicating with CrowdStrike")
@@ -155,6 +155,7 @@ func rootCmd() *cobra.Command {
 		winFlag.Uint64Var(&fc.ProvisioningWaitTime, "provisioning-wait-time", 1200000, "The number of milliseconds to wait for the sensor to provision")
 		winFlag.BoolVar(&fc.NoStart, "disable-start", false, "Prevent the sensor from starting after installation until a reboot occurs")
 		winFlag.BoolVar(&fc.VDI, "vdi", false, "Enable virtual desktop infrastructure mode")
+		winFlag.BoolVar(&fi.ConfigureImage, "configure-image", false, "Use when installing the sensor in an image")
 		rootCmd.Flags().AddFlagSet(winFlag)
 		err = viper.BindPFlags(winFlag)
 		if err != nil {
@@ -278,6 +279,10 @@ func Run(cmd *cobra.Command, args []string) {
 		fi.UserAgent = fmt.Sprintf("falcon-installer/%s", version.Version)
 	}
 	slog.Debug("User agent string", "UserAgent", fi.UserAgent)
+
+	if targetOS == "windows" && fi.ConfigureImage {
+		fc.NoStart = true
+	}
 
 	osName, osVersion, err := osutils.ReadEtcRelease(targetOS)
 	if err != nil {
