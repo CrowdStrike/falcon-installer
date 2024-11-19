@@ -84,7 +84,7 @@ func GetMaintenanceToken(client *client.CrowdStrikeAPISpecification, aid string)
 }
 
 // getToken queries the CrowdStrike API for the installation token using the token ID.
-func getToken(client *client.CrowdStrikeAPISpecification, tokenList []string) string {
+func getProvToken(client *client.CrowdStrikeAPISpecification, tokenList []string) string {
 	res, err := client.InstallationTokens.TokensRead(
 		&installation_tokens.TokensReadParams{
 			Context: context.Background(),
@@ -104,7 +104,7 @@ func getToken(client *client.CrowdStrikeAPISpecification, tokenList []string) st
 }
 
 // getTokenList queries the CrowdStrike API for the installation tokens.
-func getTokenList(client *client.CrowdStrikeAPISpecification) []string {
+func getProvTokenList(client *client.CrowdStrikeAPISpecification) []string {
 	res, err := client.InstallationTokens.TokensQuery(
 		&installation_tokens.TokensQueryParams{
 			Context: context.Background(),
@@ -122,7 +122,7 @@ func getTokenList(client *client.CrowdStrikeAPISpecification) []string {
 	return payload.Resources
 }
 
-// GetSensorProvisioningToken queries the CrowdStrike API for the sensor provisioning token.
+// GetProvisioningToken queries the CrowdStrike API for the sensor provisioning token.
 func GetProvisioningToken(client *client.CrowdStrikeAPISpecification) string {
 	res, err := client.InstallationTokens.CustomerSettingsRead(
 		&installation_tokens.CustomerSettingsReadParams{
@@ -155,7 +155,7 @@ func GetProvisioningToken(client *client.CrowdStrikeAPISpecification) string {
 
 	token := ""
 	if payload.Resources[0].TokensRequired != nil && *payload.Resources[0].TokensRequired {
-		token = getToken(client, getTokenList(client))
+		token = getProvToken(client, getProvTokenList(client))
 		slog.Debug("Found suitable Falcon installation token", "Token", token)
 	}
 

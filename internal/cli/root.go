@@ -104,7 +104,7 @@ func rootCmd() *cobra.Command {
 
 	// Falcon API flags
 	apiFlag := pflag.NewFlagSet("FalconAPI", pflag.ExitOnError)
-	apiFlag.StringVar(&fi.ClientId, "client-id", "", "Client ID for accessing CrowdStrike Falcon Platform")
+	apiFlag.StringVar(&fi.ClientID, "client-id", "", "Client ID for accessing CrowdStrike Falcon Platform")
 	apiFlag.StringVar(&fi.ClientSecret, "client-secret", "", "Client Secret for accessing CrowdStrike Falcon Platform")
 	apiFlag.StringVar(&fi.MemberCID, "member-cid", "", "Member CID for MSSP (for cases when OAuth2 authenticates multiple CIDs)")
 	apiFlag.StringVar(&fi.Cloud, "cloud", "autodiscover", "Falcon cloud abbreviation (e.g. us-1, us-2, eu-1, us-gov-1)")
@@ -145,6 +145,17 @@ func rootCmd() *cobra.Command {
 			log.Fatalf("Error binding linux flags: %v", err)
 		}
 		groups["Linux Installation Flags"] = linuxFlag
+
+	case "macos":
+		// MacOS sensor flags
+		macosFlag := pflag.NewFlagSet("MacOS", pflag.ExitOnError)
+		macosFlag.BoolVar(&fi.ConfigureImage, "configure-image", false, "Use when installing the sensor in an image")
+		rootCmd.Flags().AddFlagSet(macosFlag)
+		err = viper.BindPFlags(macosFlag)
+		if err != nil {
+			log.Fatalf("Error binding macos flags: %v", err)
+		}
+		groups["MacOS Installation Flags"] = macosFlag
 
 	case "windows":
 		// Windows sensor flags
