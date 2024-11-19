@@ -89,6 +89,8 @@ type FalconInstaller struct {
 	ClientID string
 	// ClientSecret is the client secret for accessing CrowdStrike Falcon Platform.
 	ClientSecret string
+	// AccessToken is the access token for accessing CrowdStrike Falcon Platform.
+	AccessToken string
 	// MemberCID is the member CID for MSSP (for cases when OAuth2 authenticates multiple CIDs).
 	MemberCID string
 	// Cloud is the Falcon cloud abbreviation (us-1, us-2, eu-1, us-gov-1). Defaults to autodiscover.
@@ -126,6 +128,7 @@ func Run(fc FalconInstaller) {
 	client, err := gofalcon.NewClient(&gofalcon.ApiConfig{
 		ClientId:          fc.ClientID,
 		ClientSecret:      fc.ClientSecret,
+		AccessToken:       fc.AccessToken,
 		MemberCID:         fc.MemberCID,
 		Cloud:             gofalcon.Cloud(fc.Cloud),
 		Context:           context.Background(),

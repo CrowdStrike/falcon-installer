@@ -106,6 +106,7 @@ func rootCmd() *cobra.Command {
 	apiFlag := pflag.NewFlagSet("FalconAPI", pflag.ExitOnError)
 	apiFlag.StringVar(&fi.ClientID, "client-id", "", "Client ID for accessing CrowdStrike Falcon Platform")
 	apiFlag.StringVar(&fi.ClientSecret, "client-secret", "", "Client Secret for accessing CrowdStrike Falcon Platform")
+	apiFlag.StringVar(&fi.AccessToken, "access-token", "", "Access token for accessing CrowdStrike Falcon Platform")
 	apiFlag.StringVar(&fi.MemberCID, "member-cid", "", "Member CID for MSSP (for cases when OAuth2 authenticates multiple CIDs)")
 	apiFlag.StringVar(&fi.Cloud, "cloud", "autodiscover", "Falcon cloud abbreviation (e.g. us-1, us-2, eu-1, us-gov-1)")
 	apiFlag.StringVar(&fi.SensorUpdatePolicyName, "sensor-update-policy", "platform_default", "The sensor update policy name to use for sensor installation")
@@ -235,11 +236,21 @@ func preRunValidation(cmd *cobra.Command, args []string) error {
 	// on why the command failed.
 	cmd.SilenceUsage = true
 
-	if !cmd.Flags().Changed("client-id") && !viper.IsSet("client_id") {
+	// ClientID and ClientSecret cannot be set when Access Token is provided
+	if cmd.Flags().Changed("access-token") && (cmd.Flags().Changed("client-id") || cmd.Flags().Changed("client-secret")) {
+		return fmt.Errorf("Cannot specify Client ID or Client Secret when Access Token is provided")
+	}
+
+	// Region must be specified when using Access Token
+	if cmd.Flags().Changed("access-token") && !cmd.Flags().Changed("cloud") {
+		return fmt.Errorf("Cloud region must be specified when using Access Token")
+	}
+
+	if !cmd.Flags().Changed("access-token") && !cmd.Flags().Changed("client-id") && !viper.IsSet("client_id") {
 		return fmt.Errorf("Client ID must be specified. See https://falcon.crowdstrike.com/api-clients-and-keys/clients to create or update OAuth2 credentials")
 	}
 
-	if !cmd.Flags().Changed("client-secret") && !viper.IsSet("client_secret") {
+	if !cmd.Flags().Changed("access-token") && !cmd.Flags().Changed("client-secret") && !viper.IsSet("client_secret") {
 		return fmt.Errorf("Client Secret must be specified. See https://falcon.crowdstrike.com/api-clients-and-keys/clients to create or update OAuth2 credentials")
 	}
 
