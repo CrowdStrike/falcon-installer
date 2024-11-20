@@ -124,9 +124,13 @@ func rootCmd() *cobra.Command {
 	falconFlag.StringVar(&fc.ProvisioningToken, "provisioning-token", "",
 		"The provisioning token to use for installing the sensor. If not provided, the API will attempt to retrieve a token")
 	falconFlag.StringVar(&fc.Tags, "tags", "", "A comma separated list of tags for sensor grouping")
-	falconFlag.BoolVar(&fc.ProxyDisable, "disable-proxy", false, "Disable the sensor proxy settings")
-	falconFlag.StringVar(&fc.ProxyHost, "proxy-host", "", "The proxy host for the sensor to use when communicating with CrowdStrike")
-	falconFlag.StringVar(&fc.ProxyPort, "proxy-port", "", "The proxy port for the sensor to use when communicating with CrowdStrike")
+
+	if targetOS != "macos" {
+		falconFlag.BoolVar(&fc.ProxyDisable, "disable-proxy", false, "Disable the sensor proxy settings")
+		falconFlag.StringVar(&fc.ProxyHost, "proxy-host", "", "The proxy host for the sensor to use when communicating with CrowdStrike")
+		falconFlag.StringVar(&fc.ProxyPort, "proxy-port", "", "The proxy port for the sensor to use when communicating with CrowdStrike")
+	}
+
 	rootCmd.Flags().AddFlagSet(falconFlag)
 	err = viper.BindPFlags(falconFlag)
 	if err != nil {
