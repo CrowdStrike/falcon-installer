@@ -192,8 +192,24 @@ func GetSensorUpdatePolicies(client *client.CrowdStrikeAPISpecification, osType 
 		},
 	)
 	if err != nil {
-		log.Fatal(falcon.ErrorExplain(err))
+		errPayload := falcon.ErrorExtractPayload(err)
+		if errPayload == nil {
+			log.Fatal(falcon.ErrorExplain(err))
+		}
+
+		bytes, err := errPayload.MarshalBinary()
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		if strings.Contains(string(bytes), "\"code\":403,\"message\":\"access denied, authorization failed\"") {
+			slog.Warn("Skipping getting sensor version from sensor update policies because the OAuth scope does not have permission to read sensor update policies. If you are using sensor update policies, please provide the token via CLI or update the OAuth2 client with the `Sensor update policies: Read` scope.")
+			return ""
+		} else {
+			log.Fatal(falcon.ErrorExplain(err))
+		}
 	}
+
 	payload := res.GetPayload()
 	if err = falcon.AssertNoError(payload.Errors); err != nil {
 		log.Fatal(err)
