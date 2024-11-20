@@ -26,6 +26,8 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/crowdstrike/falcon-installer/pkg/dpkg"
@@ -118,6 +120,56 @@ func ReadEtcRelease(targetOS string) (osName, osVersion string, err error) {
 	default:
 		return "", "", fmt.Errorf("Unable to determine operating system. Unsupported OS: %s", targetOS)
 	}
+}
+
+// PackageManagerLock checks if a package manager is locked due to another install taking place.
+func PackageManagerLock() (bool, error) {
+	switch {
+	case rpm.IsRpmInstalled():
+		return isLockFileInUse("/var/lib/rpm/.rpm.lock")
+	case dpkg.IsDpkgInstalled():
+		return isLockFileInUse("/var/lib/dpkg/lock")
+	default:
+		return false, nil
+	}
+}
+
+// isLockFileInUse checks if a RPM or DPKG lock file is in use by another process on Linux.
+func isLockFileInUse(lockFile string) (bool, error) {
+	procDirs, err := os.ReadDir("/proc")
+	if err != nil {
+		return false, fmt.Errorf("Error reading /proc: %v", err)
+	}
+
+	for _, procDir := range procDirs {
+		if !procDir.IsDir() {
+			continue
+		}
+
+		pid, err := strconv.Atoi(procDir.Name())
+		if err != nil {
+			continue // Not a process directory
+		}
+
+		fdPath := filepath.Join("/proc", strconv.Itoa(pid), "fd")
+		files, err := os.ReadDir(fdPath)
+		if err != nil {
+			continue // Ignore errors reading file descriptors
+		}
+
+		for _, file := range files {
+			link, err := os.Readlink(filepath.Join(fdPath, file.Name()))
+			if err != nil {
+				continue // Ignore errors reading symlinks
+			}
+
+			if link == lockFile {
+				return true, nil
+			}
+		}
+	}
+
+	return false, nil
 }
 
 // packageManagerQuery queries the linux package manager for the presence of a package.

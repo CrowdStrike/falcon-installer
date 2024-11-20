@@ -150,25 +150,24 @@ func Run(fc FalconInstaller) {
 
 	if !falconInstalled {
 		if rpm.IsRpmInstalled() {
+			gpgKey := fc.GpgKeyFile
 			slog.Info("Installing CrowdStrike Falcon GPG key")
-			if fc.GpgKeyFile != "" {
-				slog.Debug("Using provided GPG key", "GPG Key", fc.GpgKeyFile)
-				err = rpm.GpgKeyImport(fc.GpgKeyFile)
-				if err != nil {
-					log.Fatalf("Error importing GPG key: %v", err)
-				}
+
+			if gpgKey != "" {
+				slog.Debug("Using provided GPG key", "GPG Key", gpgKey)
 			} else {
-				gpgKeyFile := fmt.Sprintf("%s%s%s", fc.TmpDir, string(os.PathSeparator), "falcon-gpg-key")
-				err = os.WriteFile(gpgKeyFile, []byte(gpgPublicKey), 0600)
+				gpgKey = fmt.Sprintf("%s%s%s", fc.TmpDir, string(os.PathSeparator), "falcon-gpg-key")
+				err = os.WriteFile(gpgKey, []byte(gpgPublicKey), 0600)
 				if err != nil {
 					log.Fatalf("Error writing GPG key to file: %v", err)
 				}
-				slog.Debug("Using embedded GPG key", "GPG Key", gpgKeyFile, "Key", gpgPublicKey)
-				if err = rpm.GpgKeyImport(gpgKeyFile); err != nil {
-					log.Fatalf("Error importing GPG key: %v", err)
-				}
+				slog.Debug("Using embedded GPG key", "GPG Key", gpgKey, "Key", gpgPublicKey)
 			}
 
+			err = rpmGpgKeyRetryImport(gpgKey)
+			if err != nil {
+				log.Fatalf("Error importing GPG key: %v", err)
+			}
 		}
 
 		// Get the Falcon CID from the API if not provided
@@ -430,26 +429,58 @@ func (fi FalconInstaller) installSensor(path string) {
 	}
 }
 
-// installSensorWithRetry attempts to install the sensor every 5 seconds for 2 minutes.
+// installSensorWithRetry attempts to install the sensor every 5 seconds for 10 minutes.
 func installSensorWithRetry(c string, env string, args []string) ([]byte, []byte, error) {
-	const maxRetries = 24
+	const maxRetries = 120
 	const retryInterval = 5 * time.Second
 
 	for i := 0; i < maxRetries; i++ {
-		stdout, stderr, err := utils.RunCmdWithEnv(c, env, args)
-		if err == nil {
+		lock, err := osutils.PackageManagerLock()
+		if err != nil {
+			return nil, nil, fmt.Errorf("Error checking package manager lock: %v", err)
+		}
+
+		if !lock {
+			stdout, stderr, err := utils.RunCmdWithEnv(c, env, args)
+			if err != nil {
+				return stdout, stderr, err
+			}
+
 			return stdout, stderr, nil
 		}
 
-		if strings.Contains(string(stderr), "E: Could not get lock") {
-			slog.Warn("Package lock detected. Waiting before retrying sensor installation", "Attempt", i+1, "RetryInterval", retryInterval)
-			time.Sleep(retryInterval)
-		} else {
-			return stdout, stderr, err
-		}
+		slog.Warn("Package lock detected. Waiting before retrying sensor installation", "Attempt", i+1, "RetryInterval", retryInterval)
+		time.Sleep(retryInterval)
 	}
 
-	return nil, nil, fmt.Errorf("Error running %s: exceeded maximum retries: %d, stderr: %s", c, maxRetries, "Could not install the sensor")
+	return []byte("nil"), []byte("Could not install the sensor"), fmt.Errorf("Exceeded maximum retries: %d", maxRetries)
+}
+
+// rpmGpgKeyRetryImport attempts to import the GPG key every 5 seconds for 10 minutes.
+func rpmGpgKeyRetryImport(gpgKey string) error {
+	const maxRetries = 120
+	const retryInterval = 5 * time.Second
+
+	for i := 0; i < maxRetries; i++ {
+		lock, err := osutils.PackageManagerLock()
+		if err != nil {
+			return fmt.Errorf("Error checking package manager lock: %v", err)
+		}
+
+		if !lock {
+			err = rpm.GpgKeyImport(gpgKey)
+			if err != nil {
+				log.Fatalf("Error importing GPG key: %v", err)
+			}
+
+			return nil
+		}
+
+		slog.Warn("Package lock detected. Waiting before retrying to import GPG Key", "Attempt", i+1, "RetryInterval", retryInterval)
+		time.Sleep(retryInterval)
+	}
+
+	return fmt.Errorf("Could not install the GPG Key. Exceeded maximum retries: %d", maxRetries)
 }
 
 // configureSensorImage configures the Falcon sensor on the image.

@@ -123,6 +123,45 @@ func TestPackageManagerQuery(t *testing.T) {
 	}
 }
 
+func TestPackageManagerLock(t *testing.T) {
+	if testArch() != "linux" {
+		t.Skip("Skipping test on macOS since /proc does not exist")
+	}
+
+	got, err := PackageManagerLock()
+	if err != nil {
+		t.Error(err)
+	}
+
+	if got {
+		t.Errorf("Expected PackageManagerLock to return false: Got: %v, Error: %v", got, err)
+	}
+}
+
+func TestIsLockFileInUse(t *testing.T) {
+	if testArch() != "linux" {
+		t.Skip("Skipping test on macOS since /proc does not exist")
+	}
+
+	got, err := isLockFileInUse("continue")
+	if err != nil {
+		t.Errorf("Expected error %v", err)
+	}
+
+	if got {
+		t.Errorf("Expected IsLockFileInUse to return false: Got: %v, Error: %v", got, err)
+	}
+
+	got, err = isLockFileInUse("/dev/null")
+	if err != nil {
+		t.Error(err)
+	}
+
+	if !got {
+		t.Errorf("Expected IsLockFileInUse to return true: Got: %v, Error: %v", got, err)
+	}
+}
+
 func TestSCQueryExists(t *testing.T) {
 	got, err := scQuery("csagent")
 	if err == nil {

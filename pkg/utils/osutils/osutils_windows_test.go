@@ -111,6 +111,17 @@ func TestReadEtcRelease(t *testing.T) {
 	}
 }
 
+func TestPackageManagerLock(t *testing.T) {
+	got, err := PackageManagerLock()
+	if err != nil {
+		t.Error(err)
+	}
+
+	if got {
+		t.Errorf("Expected not to return a package lock: Got: %v, Error: %v", got, err)
+	}
+}
+
 func TestSCQuery(t *testing.T) {
 	scQueryCmnd = "sc.exe"
 	got, err := scQuery("csagent")
