@@ -28,9 +28,11 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 )
 
+// BoolToInt converts a boolean to an integer.
 func BoolToInt(b bool) uint8 {
 	if b {
 		return 1
@@ -38,6 +40,42 @@ func BoolToInt(b bool) uint8 {
 	return 0
 }
 
+// FindFile searches for a file in a directory that matches a regular expression.
+func FindFile(dir string, regex string) (string, error) {
+	found := ""
+
+	err := filepath.Walk(dir, func(path string, file os.FileInfo, err error) error {
+		if err != nil {
+			if !os.IsPermission(err) {
+				return err
+			}
+		}
+
+		if !file.IsDir() {
+			f, err := regexp.MatchString(regex, file.Name())
+			if err != nil {
+				return err
+			}
+			if f {
+				found = path
+				return filepath.SkipDir // Stop searching once the file is found
+			}
+		}
+
+		return nil
+	})
+	if err != nil {
+		return "", err
+	}
+
+	if found == "" {
+		return "", fmt.Errorf("Unable to find files in '%s' with regex: %s", dir, regex)
+	}
+
+	return found, nil
+}
+
+// RunCmdWithEnv runs a command with the specified environment variables.
 func RunCmdWithEnv(cmnd string, env string, arg []string) ([]byte, []byte, error) {
 	var stdout, stderr bytes.Buffer
 	c := exec.Command(cmnd, arg...)
@@ -58,6 +96,7 @@ func RunCmdWithEnv(cmnd string, env string, arg []string) ([]byte, []byte, error
 	return stdout.Bytes(), stderr.Bytes(), err
 }
 
+// RunCmd runs a command.
 func RunCmd(cmnd string, arg []string) ([]byte, []byte, error) {
 	var stdout, stderr bytes.Buffer
 	c := exec.Command(cmnd, arg...)

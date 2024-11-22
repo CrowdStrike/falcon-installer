@@ -118,6 +118,15 @@ func rootCmd() *cobra.Command {
 	}
 	groups["Falcon API Flags"] = apiFlag
 
+	uninstallFlag := pflag.NewFlagSet("Uninstall", pflag.ExitOnError)
+	uninstallFlag.Bool("uninstall", false, "Uninstall the Falcon sensor")
+	rootCmd.Flags().AddFlagSet(uninstallFlag)
+	err = viper.BindPFlags(uninstallFlag)
+	if err != nil {
+		log.Fatalf("Error binding falcon uninstall flags: %v", err)
+	}
+	groups["Falcon Uninstall Flags"] = uninstallFlag
+
 	// Falcon sensor flags
 	falconFlag := pflag.NewFlagSet("Falcon", pflag.ExitOnError)
 	falconFlag.StringVar(&fc.CID, "cid", "", "Falcon Customer ID. Optional when OAuth2 credentials are provided")
@@ -240,6 +249,11 @@ func preRunValidation(cmd *cobra.Command, args []string) error {
 	// on why the command failed.
 	cmd.SilenceUsage = true
 
+	// Skip the validation if uninstall flag is set
+	if cmd.Flags().Changed("uninstall") || viper.GetBool("uninstall") {
+		return nil
+	}
+
 	// ClientID and ClientSecret cannot be set when Access Token is provided
 	if cmd.Flags().Changed("access-token") && (cmd.Flags().Changed("client-id") || cmd.Flags().Changed("client-secret")) {
 		return fmt.Errorf("Cannot specify Client ID or Client Secret when Access Token is provided")
@@ -324,10 +338,14 @@ func Run(cmd *cobra.Command, args []string) {
 	fi.OsVersion = osVersion
 	fi.SensorConfig = fc
 
-	slog.Debug("Falcon sensor CLI options", "CID", fc.CID, "ProvisioningToken", fc.ProvisioningToken, "Tags", fc.Tags, "DisableProxy", fc.ProxyDisable, "ProxyHost", fc.ProxyHost, "ProxyPort", fc.ProxyPort)
-	slog.Debug("Falcon installer options", "Cloud", fi.Cloud, "MemberCID", fi.MemberCID, "SensorUpdatePolicyName", fi.SensorUpdatePolicyName, "GpgKeyFile", fi.GpgKeyFile, "TmpDir", fi.TmpDir, "OsName", fi.OsName, "OsVersion", fi.OsVersion, "OS", fi.OSType, "Arch", fi.Arch)
+	if !cmd.Flags().Changed("uninstall") {
+		slog.Debug("Falcon sensor CLI options", "CID", fc.CID, "ProvisioningToken", fc.ProvisioningToken, "Tags", fc.Tags, "DisableProxy", fc.ProxyDisable, "ProxyHost", fc.ProxyHost, "ProxyPort", fc.ProxyPort)
+		slog.Debug("Falcon installer options", "Cloud", fi.Cloud, "MemberCID", fi.MemberCID, "SensorUpdatePolicyName", fi.SensorUpdatePolicyName, "GpgKeyFile", fi.GpgKeyFile, "TmpDir", fi.TmpDir, "OsName", fi.OsName, "OsVersion", fi.OsVersion, "OS", fi.OSType, "Arch", fi.Arch)
 
-	installer.Run(fi)
+		installer.Run(fi)
+	} else {
+		installer.Uninstall(fi)
+	}
 }
 
 // inputValidation validates the input against the provided regex pattern.
