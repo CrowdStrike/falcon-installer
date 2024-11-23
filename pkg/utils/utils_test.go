@@ -55,6 +55,61 @@ func TestBoolToInt(t *testing.T) {
 	}
 }
 
+func TestFindFile(t *testing.T) {
+	switch runtime.GOOS {
+	case "windows":
+		file, err := FindFile("C:\\testingFakeDIr", "")
+		if err == nil {
+			t.Errorf("Expected error: %v, got: %v", err, file)
+		}
+
+		file, err = FindFile("C:\\Windows", "\\")
+		if err == nil {
+			t.Errorf("Expected error: %v, got: %v", err, file)
+		}
+
+		file, err = FindFile("C:\\Windows\\System32\\Sysprep", "not[goingtofindthis]file")
+		if err == nil {
+			t.Errorf("Expected error: %v, got: %v", err, file)
+		}
+
+		file, err = FindFile("C:\\Windows\\System32\\Sysprep", "sys.*exe")
+		if err != nil {
+			t.Errorf("Unexpected error: %v", err)
+		}
+
+		if !strings.Contains(file, "sysprep.exe") {
+			t.Errorf("Expected input: %q, got: %q", "sysprep.exe", file)
+		}
+
+	default:
+		file, err := FindFile("/testingFakeDIr", "")
+		if err == nil {
+			t.Errorf("Expected error: %v, got: %v", err, file)
+		}
+
+		file, err = FindFile("/etc", "\\")
+		if err == nil {
+			t.Errorf("Expected error: %v, got: %v", err, file)
+		}
+
+		file, err = FindFile("/etc/", "not[goingtofindthis]file")
+		if err == nil {
+			t.Errorf("Expected error: %v, got: %v", err, file)
+		}
+
+		file, err = FindFile("/etc/", "h[o]+sts")
+		if err != nil {
+			t.Errorf("Expected error: %v, got: %v", err, file)
+		}
+
+		if !strings.Contains(file, "hosts") {
+			t.Errorf("Expected input: %q, got: %q", "hosts", file)
+		}
+
+	}
+}
+
 func TestRunCmdWithEnv(t *testing.T) {
 	cmd, args, newline := testCmnd()
 	env := "FOO=bar"
