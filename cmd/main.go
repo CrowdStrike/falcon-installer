@@ -23,9 +23,13 @@
 package main
 
 import (
+	"log"
+
 	"github.com/crowdstrike/falcon-installer/internal/cli"
 )
 
 func main() {
-	cli.Execute() //nolint:errcheck
+	if err := cli.Execute(); err != nil {
+		log.Fatal(err)
+	}
 }
