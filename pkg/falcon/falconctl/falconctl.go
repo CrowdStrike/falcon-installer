@@ -26,6 +26,8 @@ import (
 	"fmt"
 	"log/slog"
 	"os/exec"
+	"runtime"
+	"slices"
 
 	"github.com/crowdstrike/falcon-installer/pkg/utils"
 )
@@ -44,7 +46,12 @@ func cliConfig(osType string) string {
 
 // Set configures the Falcon sensor using the OS-specific command.
 func Set(osType string, args []string) error {
-	return configureSensor(cliConfig(osType), args)
+	return configureSensor(cliConfig(osType), args, nil)
+}
+
+// SetWithMaintenanceToken configures the Falcon sensor using the OS-specific command with a maintenance token for macOS only.
+func SetWithMaintenanceTokenMacOS(osType string, args []string, maintenanceToken string) error {
+	return configureSensor(cliConfig(osType), args, &maintenanceToken)
 }
 
 // Get retrieves the Falcon sensor settings using the OS-specific command.
@@ -53,11 +60,19 @@ func Get(osType string, args []string) (string, error) {
 }
 
 // configureSensor configures the Falcon sensor using the OS-specific command.
-func configureSensor(falconCtlCmd string, args []string) error {
+func configureSensor(falconCtlCmd string, args []string, maintenanceToken *string) error {
 	slog.Debug("Configuring Falcon sensor", "Command", falconCtlCmd, "Args", args)
 
 	if _, err := exec.LookPath(falconCtlCmd); err != nil {
 		return fmt.Errorf("Could not find falcon command: %s: %v", falconCtlCmd, err)
+	}
+
+	if runtime.GOOS == "darwin" && slices.Contains(args, "--maintenance-token") {
+		if _, stderr, err := utils.RunCmdWithStdin(falconCtlCmd, args, *maintenanceToken); err != nil {
+			return fmt.Errorf("Error running falcon command: %v, stderr: %s", err, string(stderr))
+		}
+
+		return nil
 	}
 
 	if _, stderr, err := utils.RunCmd(falconCtlCmd, args); err != nil {

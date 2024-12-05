@@ -144,6 +144,26 @@ func TestRunCmd(t *testing.T) {
 	}
 }
 
+func TestRunCmdWithStdin(t *testing.T) {
+	cmd, args, newline := testCmnd()
+	stdin := "well..."
+	expectedOutput := fmt.Sprintf("hello world%s", newline)
+
+	stdout, stderr, err := RunCmdWithStdin(cmd, args, stdin)
+	if err != nil {
+		if !strings.Contains(err.Error(), "could not write to stdin") {
+			t.Errorf("Unexpected error: %v", err)
+		}
+	}
+
+	if string(stdout) != expectedOutput {
+		t.Errorf("Expected input: %q, got: %q", expectedOutput, string(stdout))
+	}
+	if string(stderr) != "" {
+		t.Errorf("Expected output: %q, got: %q", "", string(stderr))
+	}
+}
+
 func TestOpenFileForWriting(t *testing.T) {
 	filename := "test.txt"
 	dir := os.TempDir()

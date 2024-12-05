@@ -23,6 +23,7 @@
 package installer
 
 import (
+	"fmt"
 	"log"
 	"log/slog"
 	"os/exec"
@@ -41,13 +42,13 @@ func Uninstall(fc FalconInstaller) {
 
 	// Uninstall the Falcon Sensor
 	if falconInstalled {
-		fc.uninstallSensor()
+		fc.uninstallSensor(fc.SensorConfig.MaintenanceToken)
 	}
 	slog.Info("Falcon Sensor has been uninstalled")
 }
 
 // installSensor installs the Falcon sensor using the appropriate package manager.
-func (fc FalconInstaller) uninstallSensor() {
+func (fc FalconInstaller) uninstallSensor(maintenanceToken string) {
 	c := ""
 	env := ""
 	args := []string{} //nolint:staticcheck
@@ -89,6 +90,10 @@ func (fc FalconInstaller) uninstallSensor() {
 		uninstallRegex := `^((WindowsSensor|FalconSensor_Windows).*\.)(exe)$`
 		dir := "C:\\ProgramData\\Package Cache"
 
+		if maintenanceToken != "" {
+			uninstallArgs = append(uninstallArgs, fmt.Sprintf("MAINTENANCE_TOKEN=%s", maintenanceToken))
+		}
+
 		slog.Debug("Finding the Falcon Sensor uninstaller", "Directory", dir, "Regex", uninstallRegex)
 		uninstaller, err := utils.FindFile(dir, uninstallRegex)
 		if err != nil {
@@ -103,14 +108,16 @@ func (fc FalconInstaller) uninstallSensor() {
 
 		slog.Debug("Removing Falcon Sensor")
 	case "macos":
-		slog.Debug("Unloading the Falcon Sensor")
-		if err := falconctl.Set(fc.OSType, fc.macosArgHandler("unload")); err != nil {
-			log.Fatalf("Error configuring Falcon sensor: %v", err)
-		}
-
-		slog.Debug("Uninstalling the Falcon Sensor")
-		if err := falconctl.Set(fc.OSType, fc.macosArgHandler("uninstall")); err != nil {
-			log.Fatalf("Error configuring Falcon sensor: %v", err)
+		if maintenanceToken != "" {
+			slog.Debug("Uninstalling the Falcon Sensor with maintenance token")
+			if err := falconctl.SetWithMaintenanceTokenMacOS(fc.OSType, fc.macosArgHandler("uninstall"), maintenanceToken); err != nil {
+				log.Fatalf("Error configuring Falcon sensor: %v", err)
+			}
+		} else {
+			slog.Debug("Uninstalling the Falcon Sensor")
+			if err := falconctl.Set(fc.OSType, fc.macosArgHandler("uninstall")); err != nil {
+				log.Fatalf("Error configuring Falcon sensor: %v", err)
+			}
 		}
 	default:
 		log.Fatalf("Unable to begin package installation. Unsupported OS: %s", fc.OSType)
