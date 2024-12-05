@@ -133,6 +133,7 @@ func rootCmd() *cobra.Command {
 	falconFlag.StringVar(&fc.ProvisioningToken, "provisioning-token", "",
 		"The provisioning token to use for installing the sensor. If not provided, the API will attempt to retrieve a token")
 	falconFlag.StringVar(&fc.Tags, "tags", "", "A comma separated list of tags for sensor grouping")
+	falconFlag.StringVar(&fc.MaintenanceToken, "maintenance-token", "", "Maintenance token for uninstalling the sensor or configuring sensor settings")
 
 	if targetOS != "macos" {
 		falconFlag.BoolVar(&fc.ProxyDisable, "disable-proxy", false, "Disable the sensor proxy settings")

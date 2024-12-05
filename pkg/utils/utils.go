@@ -112,6 +112,42 @@ func RunCmd(cmnd string, arg []string) ([]byte, []byte, error) {
 	return stdout.Bytes(), stderr.Bytes(), err
 }
 
+// RunCmdWithStdin runs a command with standard input.
+func RunCmdWithStdin(cmnd string, arg []string, stdin string) ([]byte, []byte, error) {
+	var stdout, stderr bytes.Buffer
+	c := exec.Command(cmnd, arg...)
+
+	if c.Stdout == nil {
+		c.Stdout = &stdout
+	}
+	if c.Stderr == nil {
+		c.Stderr = &stderr
+	}
+
+	stdinPipe, err := c.StdinPipe()
+	if err != nil {
+		return nil, nil, fmt.Errorf("could not get stdin pipe: %w", err)
+	}
+
+	if err := c.Start(); err != nil {
+		return nil, stderr.Bytes(), fmt.Errorf("could not start command: %w", err)
+	}
+
+	if _, err := stdinPipe.Write([]byte(stdin)); err != nil {
+		return nil, stderr.Bytes(), fmt.Errorf("could not write to stdin: %w", err)
+	}
+
+	if err := stdinPipe.Close(); err != nil {
+		return nil, stderr.Bytes(), fmt.Errorf("could not close stdin: %w", err)
+	}
+
+	if err := c.Wait(); err != nil {
+		return nil, stderr.Bytes(), fmt.Errorf("could not wait for command: %w", err)
+	}
+
+	return stdout.Bytes(), stderr.Bytes(), nil
+}
+
 // OpenFileForWriting opens a file for writing, creating the directory if it doesn't exist.
 func OpenFileForWriting(dir, filename string) (*os.File, error) {
 	if strings.Contains(filename, "/") {
