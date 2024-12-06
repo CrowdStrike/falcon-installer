@@ -89,8 +89,12 @@ func rootCmd() *cobra.Command {
 		Long:             "A lightweight, multi-platform CrowdStrike Falcon sensor installer written in Golang with consistent configuration flags across multiple operating systems.",
 		Version:          cliVersion,
 		PersistentPreRun: preRunConfig,
-		PreRunE:          preRunValidation,
-		Run:              Run,
+		PreRun: func(cmd *cobra.Command, args []string) {
+			if err := preRunValidation(cmd); err != nil {
+				log.Fatalf("%v", err)
+			}
+		},
+		Run: Run,
 	}
 
 	rootCmd.PersistentFlags().StringVar(&fi.TmpDir, "tmpdir", defaultTmpDir, "Temporary directory for downloading files")
@@ -243,7 +247,7 @@ func preRunConfig(cmd *cobra.Command, args []string) {
 }
 
 // preRunValidation validates the input flags before running the command.
-func preRunValidation(cmd *cobra.Command, args []string) error {
+func preRunValidation(cmd *cobra.Command) error {
 	viper := viper.GetViper()
 
 	// Silence usage if an error occurs since the usage string does not provide additional information
