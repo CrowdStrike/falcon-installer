@@ -23,14 +23,17 @@
 package installer
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"log/slog"
 	"os/exec"
 
+	"github.com/crowdstrike/falcon-installer/pkg/falcon"
 	"github.com/crowdstrike/falcon-installer/pkg/falcon/falconctl"
 	"github.com/crowdstrike/falcon-installer/pkg/utils"
 	"github.com/crowdstrike/falcon-installer/pkg/utils/osutils"
+	gofalcon "github.com/crowdstrike/gofalcon/falcon"
 )
 
 // Uninstall removes the Falcon Sensor from the target system.
@@ -42,6 +45,30 @@ func Uninstall(fc FalconInstaller) {
 
 	// Uninstall the Falcon Sensor
 	if falconInstalled {
+		if fc.SensorConfig.MaintenanceToken == "" && (fc.AccessToken != "" || fc.ClientSecret != "") {
+			client, err := gofalcon.NewClient(&gofalcon.ApiConfig{
+				ClientId:          fc.ClientID,
+				ClientSecret:      fc.ClientSecret,
+				AccessToken:       fc.AccessToken,
+				MemberCID:         fc.MemberCID,
+				Cloud:             gofalcon.Cloud(fc.Cloud),
+				Context:           context.Background(),
+				UserAgentOverride: fc.UserAgent,
+			})
+			if err != nil {
+				log.Fatalf("Error creating Falcon client: %v", err)
+			}
+
+			slog.Debug("Maintenance token not provided. Retrieving the AID to get a maintenance token for uninstallation")
+			aid, err := falconctl.GetAID()
+			if err != nil {
+				log.Fatalf("Error retrieving the AID: %v", err)
+			}
+
+			slog.Debug("Getting maintenance token for uninstallation using the AID", "AID", aid)
+			fc.SensorConfig.MaintenanceToken = falcon.GetMaintenanceToken(client, aid)
+		}
+
 		fc.uninstallSensor(fc.SensorConfig.MaintenanceToken)
 	}
 	slog.Info("Falcon Sensor has been uninstalled")
