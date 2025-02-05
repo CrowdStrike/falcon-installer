@@ -254,12 +254,16 @@ func GetSensors(client *client.CrowdStrikeAPISpecification, osName string, osVer
 
 	sensorVersion := GetSensorUpdatePolicies(client, osType, arch, sensorUpdatePolicyName)
 	if osName != "" {
+		osVersionFilter := fmt.Sprintf("*%s*", osVersion)
 		if slices.Contains(enterpriseLinux, strings.ToLower(osName)) {
 			slog.Debug("Adding wildcard for Enterprise Linux", "Distros", enterpriseLinux, "OS", osName, "Version", osVersion)
 			osName = "*RHEL*"
+		} else if osName == "amzn" {
+			osName = "Amazon Linux"
+			osVersionFilter = osVersion
 		}
 
-		f := fmt.Sprintf("os:~\"%s\"+os_version:\"*%s*\"+architectures:\"%s\"", osName, osVersion, arch)
+		f := fmt.Sprintf("os:~\"%s\"+os_version:\"%s\"+architectures:\"%s\"", osName, osVersionFilter, arch)
 		if sensorVersion != "" {
 			f = fmt.Sprintf("%s+version:\"%s\"", f, sensorVersion)
 		}
