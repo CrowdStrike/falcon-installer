@@ -420,7 +420,7 @@ func (fi FalconInstaller) installSensor(path string) {
 		c = "/usr/sbin/installer"
 		args = []string{"-verboseR", "-pkg", path, "-target", "/"}
 
-		stdout, stderr, err := utils.RunCmdWithEnv(c, env, args)
+		stdout, stderr, err := utils.RunCmd(c, args, utils.WithCmdEnvOption([]string{env}))
 		if err != nil {
 			log.Fatalf("Error running %s: %v, stdout: %s, stderr: %s", c, err, string(stdout), string(stderr))
 		}
@@ -441,7 +441,7 @@ func installSensorWithRetry(c string, env string, args []string) ([]byte, []byte
 		}
 
 		if !lock {
-			stdout, stderr, err := utils.RunCmdWithEnv(c, env, args)
+			stdout, stderr, err := utils.RunCmd(c, args, utils.WithCmdEnvOption([]string{env}))
 			if err != nil {
 				return stdout, stderr, err
 			}

@@ -37,8 +37,7 @@ func RestartService(name string) error {
 		return fmt.Errorf("Could not find systemctl: %s, %v", systemctlCmd, err)
 	}
 
-	args := []string{"restart", name}
-	if _, _, err := utils.RunCmd(systemctlCmd, args); err != nil {
+	if _, _, err := utils.RunCmd(systemctlCmd, []string{"restart", name}); err != nil {
 		return fmt.Errorf("Error restarting service %s: %v", name, err)
 	}
 

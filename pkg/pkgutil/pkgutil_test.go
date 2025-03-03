@@ -33,14 +33,14 @@ func skipPkgUtilTests(t *testing.T) {
 }
 
 func TestIsPkgUtilInstalled(t *testing.T) {
-	pkgUtilCmnd = "/usr/bin/asdfasdf"
+	pkgUtilCmd = "/usr/bin/asdfasdf"
 	got := IsPkgUtilInstalled()
 
 	if got {
-		t.Errorf("Expected %s not to exist: Got: %v", pkgUtilCmnd, got)
+		t.Errorf("Expected %s not to exist: Got: %v", pkgUtilCmd, got)
 	}
 
-	pkgUtilCmnd = "/usr/sbin/pkgutil"
+	pkgUtilCmd = "/usr/sbin/pkgutil"
 
 	// Skip pkgutil query if pkgutil is not installed
 	skipPkgUtilTests(t)
@@ -52,7 +52,7 @@ func TestIsPkgUtilInstalled(t *testing.T) {
 }
 
 func TestQuery(t *testing.T) {
-	pkgUtilCmnd = "/usr/sbin/pkgutil"
+	pkgUtilCmd = "/usr/sbin/pkgutil"
 
 	// Skip pkgutil query if pkgutil is not installed
 	skipPkgUtilTests(t)
