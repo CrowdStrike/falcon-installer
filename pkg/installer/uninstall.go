@@ -141,12 +141,12 @@ func (fc FalconInstaller) uninstallSensor(maintenanceToken string) {
 	case "macos":
 		if maintenanceToken != "" {
 			slog.Debug("Uninstalling the Falcon Sensor with maintenance token")
-			if err := falconctl.SetWithMaintenanceTokenMacOS(fc.OSType, fc.macosArgHandler("uninstall"), maintenanceToken); err != nil {
+			if err := falconctl.Set(fc.macosArgHandler("uninstall"), falconctl.WithSensorMaintenanceTokenOption(maintenanceToken)); err != nil {
 				log.Fatalf("Error configuring Falcon sensor: %v", err)
 			}
 		} else {
 			slog.Debug("Uninstalling the Falcon Sensor")
-			if err := falconctl.Set(fc.OSType, fc.macosArgHandler("uninstall")); err != nil {
+			if err := falconctl.Set(fc.macosArgHandler("uninstall")); err != nil {
 				log.Fatalf("Error configuring Falcon sensor: %v", err)
 			}
 		}

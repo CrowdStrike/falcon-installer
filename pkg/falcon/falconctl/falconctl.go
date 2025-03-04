@@ -27,14 +27,40 @@ import (
 	"log/slog"
 	"os/exec"
 	"runtime"
-	"slices"
 	"strings"
 
 	"github.com/crowdstrike/falcon-installer/pkg/utils"
 )
 
-// cliConfig returns the path to the Falcon sensor command line interface based on the OS type.
-func cliConfig(osType string) string {
+// SensorConfig represents the configuration for the Falcon sensor CLI.
+type SensorConfig struct {
+	// Path to the falconctl binary
+	path string
+}
+
+// SensorOption defines a functional option for sensor configuration.
+type SensorOption func(*sensorOptions)
+
+type sensorOptions struct {
+	maintenanceToken *string
+}
+
+// WithMaintenanceToken provides a maintenance token for macOS sensor configuration.
+func WithSensorMaintenanceTokenOption(token string) SensorOption {
+	return func(o *sensorOptions) {
+		o.maintenanceToken = &token
+	}
+}
+
+// NewSensorConfig creates a new SensorConfig for the specified OS.
+func NewSensorConfig(osType string) *SensorConfig {
+	return &SensorConfig{
+		path: getCliPath(osType),
+	}
+}
+
+// getCliPath returns the path to the Falcon sensor command line interface based on the OS type.
+func getCliPath(osType string) string {
 	switch osType {
 	case "macos", "darwin":
 		return "/Applications/Falcon.app/Contents/Resources/falconctl"
@@ -45,56 +71,79 @@ func cliConfig(osType string) string {
 	}
 }
 
-// Set configures the Falcon sensor using the OS-specific command.
-func Set(osType string, args []string) error {
-	return configureSensor(cliConfig(osType), args, nil)
-}
+// Set configures the Falcon sensor.
+// For macOS, an optional maintenance token can be provided.
+func (s *SensorConfig) Set(args []string, options ...SensorOption) error {
+	// Apply options
+	opts := &sensorOptions{}
+	for _, option := range options {
+		option(opts)
+	}
 
-// SetWithMaintenanceToken configures the Falcon sensor using the OS-specific command with a maintenance token for macOS only.
-func SetWithMaintenanceTokenMacOS(osType string, args []string, maintenanceToken string) error {
-	return configureSensor(cliConfig(osType), args, &maintenanceToken)
+	return s.configure(args, opts.maintenanceToken)
 }
 
 // Get retrieves the Falcon sensor settings using the OS-specific command.
-func Get(osType string, args []string) (string, error) {
-	return getSensorSettings(cliConfig(osType), args)
-}
+func (s *SensorConfig) Get(args []string) (string, error) {
+	slog.Debug("Getting sensor settings", "command", s.path, "args", args)
 
-// configureSensor configures the Falcon sensor using the OS-specific command.
-func configureSensor(falconCtlCmd string, args []string, maintenanceToken *string) error {
-	slog.Debug("Configuring Falcon sensor", "Command", falconCtlCmd, "Args", args)
-
-	if _, err := exec.LookPath(falconCtlCmd); err != nil {
-		return fmt.Errorf("Could not find falcon command: %s: %v", falconCtlCmd, err)
+	if err := s.validatePath(); err != nil {
+		return "", err
 	}
 
-	if runtime.GOOS == "darwin" && slices.Contains(args, "--maintenance-token") {
-		if _, stderr, err := utils.RunCmd(falconCtlCmd, args, utils.WithCmdStdinOption(strings.NewReader(*maintenanceToken))); err != nil {
-			return fmt.Errorf("Error running falcon command: %v, stderr: %s", err, string(stderr))
-		}
+	stdout, stderr, err := utils.RunCmd(s.path, args)
+	if err != nil {
+		return "", fmt.Errorf("failed to get sensor settings: %w (stderr: %s)", err, stderr)
+	}
 
+	return string(stdout), nil
+}
+
+// configure sets up the Falcon sensor using the OS-specific command.
+func (s *SensorConfig) configure(args []string, maintenanceToken *string) error {
+	slog.Debug("Configuring Falcon sensor", "command", s.path, "args", args)
+
+	if err := s.validatePath(); err != nil {
+		return err
+	}
+
+	// Handle macOS maintenance token case
+	if runtime.GOOS == "darwin" && maintenanceToken != nil {
+		_, stderr, err := utils.RunCmd(s.path, args,
+			utils.WithCmdStdinOption(strings.NewReader(*maintenanceToken)))
+		if err != nil {
+			return fmt.Errorf("failed to configure sensor with maintenance token: %w (stderr: %s)",
+				err, stderr)
+		}
 		return nil
 	}
 
-	if _, stderr, err := utils.RunCmd(falconCtlCmd, args); err != nil {
-		return fmt.Errorf("Error running falcon command: %v, stderr: %s", err, string(stderr))
+	// Standard configuration
+	_, stderr, err := utils.RunCmd(s.path, args)
+	if err != nil {
+		return fmt.Errorf("failed to configure sensor: %w (stderr: %s)", err, stderr)
 	}
 
 	return nil
 }
 
-// getSensorSettings using the sensor command line interface.
-func getSensorSettings(falconCtlCmd string, args []string) (string, error) {
-	slog.Debug("Getting sensor settings", "Command", falconCtlCmd, "Args", args)
-
-	if _, err := exec.LookPath(falconCtlCmd); err != nil {
-		return "", fmt.Errorf("Could not find falcon command: %s: %v", falconCtlCmd, err)
+// validatePath ensures the falconctl binary exists.
+func (s *SensorConfig) validatePath() error {
+	if _, err := exec.LookPath(s.path); err != nil {
+		return fmt.Errorf("falcon command not found at %s: %w", s.path, err)
 	}
+	return nil
+}
 
-	stdout, stderr, err := utils.RunCmd(falconCtlCmd, args)
-	if err != nil {
-		return "", fmt.Errorf("Error running falcon command: %v, stderr: %s", err, string(stderr))
-	}
+// Set configures the Falcon sensor for the specified OS.
+// For macOS, an optional maintenance token can be provided.
+func Set(args []string, options ...SensorOption) error {
+	config := NewSensorConfig(runtime.GOOS)
+	return config.Set(args, options...)
+}
 
-	return string(stdout), nil
+// Get retrieves the Falcon sensor settings for the specified OS.
+func Get(args []string) (string, error) {
+	config := NewSensorConfig(runtime.GOOS)
+	return config.Get(args)
 }
