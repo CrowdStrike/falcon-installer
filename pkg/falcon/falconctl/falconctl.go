@@ -28,6 +28,7 @@ import (
 	"os/exec"
 	"runtime"
 	"slices"
+	"strings"
 
 	"github.com/crowdstrike/falcon-installer/pkg/utils"
 )
@@ -68,7 +69,7 @@ func configureSensor(falconCtlCmd string, args []string, maintenanceToken *strin
 	}
 
 	if runtime.GOOS == "darwin" && slices.Contains(args, "--maintenance-token") {
-		if _, stderr, err := utils.RunCmdWithStdin(falconCtlCmd, args, *maintenanceToken); err != nil {
+		if _, stderr, err := utils.RunCmd(falconCtlCmd, args, utils.WithCmdStdinOption(strings.NewReader(*maintenanceToken))); err != nil {
 			return fmt.Errorf("Error running falcon command: %v, stderr: %s", err, string(stderr))
 		}
 

@@ -34,9 +34,7 @@ var rpmCmd = "/usr/bin/rpm"
 
 // Query checks if a package is installed e.g. `rpm -q <package>`.
 func Query(name string) (bool, error) {
-	args := []string{"-q", name}
-
-	if stdout, _, err := utils.RunCmd(rpmCmd, args); err != nil {
+	if stdout, _, err := utils.RunCmd(rpmCmd, []string{"-q", name}); err != nil {
 		if strings.Contains(string(stdout), "is not installed") {
 			return false, nil
 		}
@@ -56,9 +54,7 @@ func IsRpmInstalled() bool {
 
 // GpgKeyImport imports a gpg key into the rpm keyring.
 func GpgKeyImport(gpgKeyFile string) error {
-	args := []string{"--import", gpgKeyFile}
-
-	if _, _, err := utils.RunCmd(rpmCmd, args); err != nil {
+	if _, _, err := utils.RunCmd(rpmCmd, []string{"--import", gpgKeyFile}); err != nil {
 		return fmt.Errorf("Error running rpm gpg key import: %v", err)
 	}
 

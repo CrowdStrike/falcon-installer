@@ -40,16 +40,15 @@ func IsDpkgInstalled() bool {
 	return true
 }
 
-// Query checks if a package is installed e.g. `dpkg -l <package>`.
+// Query checks if a package is installed using `dpkg -l <package>`.
 func Query(name string) (bool, error) {
-	args := []string{"-l", name}
-
-	if _, stderr, err := utils.RunCmd(dpkgCmd, args); err != nil {
+	stdout, stderr, err := utils.RunCmd(dpkgCmd, []string{"-l", name})
+	if err != nil {
 		if strings.Contains(string(stderr), "no packages found") {
 			return false, nil
 		}
-		return false, fmt.Errorf("Error running dpkg query: %v", err)
+		return false, fmt.Errorf("error running dpkg query: %w", err)
 	}
 
-	return true, nil
+	return strings.Contains(string(stdout), name), nil
 }

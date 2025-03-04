@@ -115,7 +115,7 @@ func TestRunCmdWithEnv(t *testing.T) {
 	env := "FOO=bar"
 	expectedOutput := fmt.Sprintf("hello world%s", newline)
 
-	stdout, stderr, err := RunCmdWithEnv(cmd, env, args)
+	stdout, stderr, err := RunCmd(cmd, args, WithCmdEnvOption([]string{env}))
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -149,7 +149,7 @@ func TestRunCmdWithStdin(t *testing.T) {
 	stdin := "well..."
 	expectedOutput := fmt.Sprintf("hello world%s", newline)
 
-	stdout, stderr, err := RunCmdWithStdin(cmd, args, stdin)
+	stdout, stderr, err := RunCmd(cmd, args, WithCmdStdinOption(strings.NewReader(stdin)))
 	if err != nil {
 		if !strings.Contains(err.Error(), "could not write to stdin") {
 			t.Errorf("Unexpected error: %v", err)
@@ -181,7 +181,7 @@ func TestOpenFileForWriting(t *testing.T) {
 
 	filename = "/test.txt"
 	_, err = OpenFileForWriting(dir, filename)
-	if !strings.Contains(err.Error(), "Refusing to download: '/test.txt' includes '/' character") {
+	if !strings.Contains(err.Error(), "refusing to download: '/test.txt' includes '/' character") {
 		t.Errorf("Unexpected error: %v", err)
 	}
 

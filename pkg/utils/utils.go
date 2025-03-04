@@ -25,6 +25,7 @@ package utils
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -44,122 +45,93 @@ func BoolToInt(b bool) uint8 {
 func FindFile(dir string, regex string) (string, error) {
 	found := ""
 
-	err := filepath.Walk(dir, func(path string, file os.FileInfo, err error) error {
+	re, err := regexp.Compile(regex)
+	if err != nil {
+		return "", fmt.Errorf("invalid regex: %w", err)
+	}
+
+	err = filepath.Walk(dir, func(path string, file os.FileInfo, err error) error {
 		if err != nil {
-			if !os.IsPermission(err) {
-				return err
+			if os.IsPermission(err) {
+				return nil // Skip directories we can't access
 			}
+			return err
 		}
 
-		if !file.IsDir() {
-			f, err := regexp.MatchString(regex, file.Name())
-			if err != nil {
-				return err
-			}
-			if f {
-				found = path
-				return filepath.SkipDir // Stop searching once the file is found
-			}
+		if !file.IsDir() && re.MatchString(file.Name()) {
+			found = path
+			return filepath.SkipDir // Stop searching once the file is found
 		}
 
 		return nil
 	})
+
 	if err != nil {
 		return "", err
 	}
 
 	if found == "" {
-		return "", fmt.Errorf("Unable to find files in '%s' with regex: %s", dir, regex)
+		return "", fmt.Errorf("no files found in '%s' matching regex: %s", dir, regex)
 	}
 
 	return found, nil
 }
 
-// RunCmdWithEnv runs a command with the specified environment variables.
-func RunCmdWithEnv(cmnd string, env string, arg []string) ([]byte, []byte, error) {
-	var stdout, stderr bytes.Buffer
-	c := exec.Command(cmnd, arg...)
+// CmdOption defines a functional option for command execution.
+type CmdOption func(*exec.Cmd)
 
-	if len(env) > 0 {
-		c.Env = os.Environ()
-		c.Env = append(c.Env, env)
+// WithEnv adds environment variables to the command.
+func WithCmdEnvOption(env []string) CmdOption {
+	return func(cmd *exec.Cmd) {
+		cmd.Env = append(os.Environ(), env...)
 	}
-
-	if c.Stdout == nil {
-		c.Stdout = &stdout
-	}
-	if c.Stderr == nil {
-		c.Stderr = &stderr
-	}
-
-	err := c.Run()
-	return stdout.Bytes(), stderr.Bytes(), err
 }
 
-// RunCmd runs a command.
-func RunCmd(cmnd string, arg []string) ([]byte, []byte, error) {
-	var stdout, stderr bytes.Buffer
-	c := exec.Command(cmnd, arg...)
-
-	if c.Stdout == nil {
-		c.Stdout = &stdout
+// WithStdin sets the standard input for the command.
+func WithCmdStdinOption(stdin io.Reader) CmdOption {
+	return func(cmd *exec.Cmd) {
+		cmd.Stdin = stdin
 	}
-	if c.Stderr == nil {
-		c.Stderr = &stderr
-	}
-
-	err := c.Run()
-	return stdout.Bytes(), stderr.Bytes(), err
 }
 
-// RunCmdWithStdin runs a command with standard input.
-func RunCmdWithStdin(cmnd string, arg []string, stdin string) ([]byte, []byte, error) {
+// RunCmd runs a command with optional configuration.
+// It executes the specified command with given arguments and returns
+// the stdout and stderr output as byte slices, along with any error encountered.
+// The command's behavior can be customized using optional CmdOption parameters.
+func RunCmd(cmnd string, args []string, opts ...CmdOption) ([]byte, []byte, error) {
 	var stdout, stderr bytes.Buffer
-	c := exec.Command(cmnd, arg...)
+	cmd := exec.Command(cmnd, args...)
 
-	if c.Stdout == nil {
-		c.Stdout = &stdout
-	}
-	if c.Stderr == nil {
-		c.Stderr = &stderr
-	}
+	// Set default values
+	cmd.Env = os.Environ() // Default to current environment
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
 
-	stdinPipe, err := c.StdinPipe()
-	if err != nil {
-		return nil, nil, fmt.Errorf("could not get stdin pipe: %w", err)
+	// Apply options
+	for _, opt := range opts {
+		opt(cmd)
 	}
 
-	if err := c.Start(); err != nil {
-		return nil, stderr.Bytes(), fmt.Errorf("could not start command: %w", err)
-	}
-
-	if _, err := stdinPipe.Write([]byte(stdin)); err != nil {
-		return nil, stderr.Bytes(), fmt.Errorf("could not write to stdin: %w", err)
-	}
-
-	if err := stdinPipe.Close(); err != nil {
-		return nil, stderr.Bytes(), fmt.Errorf("could not close stdin: %w", err)
-	}
-
-	if err := c.Wait(); err != nil {
-		return nil, stderr.Bytes(), fmt.Errorf("could not wait for command: %w", err)
-	}
-
-	return stdout.Bytes(), stderr.Bytes(), nil
+	err := cmd.Run()
+	return stdout.Bytes(), stderr.Bytes(), err
 }
 
 // OpenFileForWriting opens a file for writing, creating the directory if it doesn't exist.
 func OpenFileForWriting(dir, filename string) (*os.File, error) {
 	if strings.Contains(filename, "/") {
-		return nil, fmt.Errorf("Refusing to download: '%s' includes '/' character", filename)
+		return nil, fmt.Errorf("refusing to download: '%s' includes '/' character", filename)
 	}
+
 	path := filepath.Join(dir, filename)
 	safeLocation := filepath.Clean(path)
+
 	if strings.Contains(safeLocation, "..") {
-		return nil, fmt.Errorf("Refusing to download: Path '%s' looks suspicious", safeLocation)
+		return nil, fmt.Errorf("refusing to download: path '%s' looks suspicious", safeLocation)
 	}
+
 	if err := os.MkdirAll(dir, 0700); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to create directory: %w", err)
 	}
+
 	return os.OpenFile(safeLocation, os.O_CREATE|os.O_WRONLY, 0600)
 }
