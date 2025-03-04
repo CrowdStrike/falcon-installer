@@ -31,29 +31,51 @@ import (
 	"strings"
 )
 
-// GetAID retrieves the agent ID (AID) from the Falcon sensor.
+// GetAID retrieves the Agent ID (AID) from the Falcon sensor.
 func GetAID() (string, error) {
 	switch runtime.GOOS {
-	case "darwin":
-		stats, err := Get("macos", []string{"stats"})
-		if err != nil {
-			return "", fmt.Errorf("Could not get stats: %v", err)
-		}
-
-		for _, line := range strings.Split(stats, "\n") {
-			if strings.Contains(line, "agentID") {
-				return strings.ReplaceAll(strings.ToLower(strings.Split(line, " ")[1]), "-", ""), nil
-			}
-		}
-		return "", fmt.Errorf("Unsupported OS: %v", runtime.GOOS)
+	case "darwin", "macos":
+		return getMacOSAID()
 	case "linux":
-		aid := ""
-		var err error
-		if aid, err = Get("linux", []string{"-g", "--aid"}); err != nil {
-			return "", fmt.Errorf("Error retrieving Falcon sensor settings: %v", err)
-		}
-		return strings.Split(aid, "\"")[1], nil
+		return getLinuxAID()
 	default:
-		return "", fmt.Errorf("Unsupported OS: %v", runtime.GOOS)
+		return "", fmt.Errorf("unsupported OS for AID retrieval: %s", runtime.GOOS)
 	}
+}
+
+// getMacOSAID retrieves the Agent ID from the Falcon sensor on macOS.
+func getMacOSAID() (string, error) {
+	stats, err := Get([]string{"stats"})
+	if err != nil {
+		return "", fmt.Errorf("failed to get sensor stats: %w", err)
+	}
+
+	for _, line := range strings.Split(stats, "\n") {
+		if strings.Contains(line, "agentID") {
+			parts := strings.Fields(line)
+			if len(parts) < 2 {
+				return "", fmt.Errorf("unexpected format in stats output: %s", line)
+			}
+			// Extract and normalize the AID
+			return strings.ReplaceAll(strings.ToLower(parts[1]), "-", ""), nil
+		}
+	}
+
+	return "", fmt.Errorf("agent ID not found in sensor stats")
+}
+
+// getLinuxAID retrieves the Agent ID from the Falcon sensor on Linux.
+func getLinuxAID() (string, error) {
+	output, err := Get([]string{"-g", "--aid"})
+	if err != nil {
+		return "", fmt.Errorf("failed to retrieve agent ID: %w", err)
+	}
+
+	// Parse the output to extract the AID
+	parts := strings.Split(output, "\"")
+	if len(parts) < 2 {
+		return "", fmt.Errorf("unexpected format in AID output: %s", output)
+	}
+
+	return parts[1], nil
 }

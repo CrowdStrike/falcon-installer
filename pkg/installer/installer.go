@@ -202,7 +202,7 @@ func Run(fc FalconInstaller) {
 	switch fc.OSType {
 	case "linux":
 		if len(falconArgs) > 1 {
-			if err := falconctl.Set(fc.OSType, falconArgs); err != nil {
+			if err := falconctl.Set(falconArgs); err != nil {
 				log.Fatalf("Error configuring Falcon sensor: %v", err)
 			}
 		} else {
@@ -217,26 +217,26 @@ func Run(fc FalconInstaller) {
 		}
 	case "macos":
 		if !falconInstalled {
-			if err := falconctl.Set(fc.OSType, fc.macosArgHandler("license")); err != nil {
+			if err := falconctl.Set(fc.macosArgHandler("license")); err != nil {
 				if !strings.Contains(err.Error(), "Computer needs to be rebooted first") {
 					log.Fatalf("Error configuring Falcon sensor: %v", err)
 				}
 
 				slog.Debug("Loading Falcon sensor kernel extension")
-				if err := falconctl.Set(fc.OSType, fc.macosArgHandler("load")); err != nil {
+				if err := falconctl.Set(fc.macosArgHandler("load")); err != nil {
 					log.Fatalf("Error configuring Falcon sensor: %v", err)
 				}
 			}
 		} else if fc.SensorConfig.Tags != "" {
-			if err := falconctl.Set(fc.OSType, fc.macosArgHandler("grouping-tags")); err != nil {
+			if err := falconctl.Set(fc.macosArgHandler("grouping-tags")); err != nil {
 				log.Fatalf("Error configuring Falcon sensor: %v", err)
 			}
 
-			if err := falconctl.Set(fc.OSType, fc.macosArgHandler("unload")); err != nil {
+			if err := falconctl.Set(fc.macosArgHandler("unload")); err != nil {
 				log.Fatalf("Error configuring Falcon sensor: %v", err)
 			}
 
-			if err := falconctl.Set(fc.OSType, fc.macosArgHandler("load")); err != nil {
+			if err := falconctl.Set(fc.macosArgHandler("load")); err != nil {
 				log.Fatalf("Error configuring Falcon sensor: %v", err)
 			}
 		} else {
@@ -498,7 +498,7 @@ func (fi FalconInstaller) configureSensorImage() error {
 		val := ""
 
 		for i := 0; i < maxRetries; i++ {
-			if val, err = falconctl.Get(fi.OSType, aid); err != nil {
+			if val, err = falconctl.Get(aid); err != nil {
 				return fmt.Errorf("Error retrieving Falcon sensor settings: %v", err)
 			}
 
@@ -517,7 +517,7 @@ func (fi FalconInstaller) configureSensorImage() error {
 		// Remove the aid
 		slog.Debug("Removing the aid from the sensor configuration")
 		delAid := []string{"-d", "-f", "--aid"}
-		if err := falconctl.Set(fi.OSType, delAid); err != nil {
+		if err := falconctl.Set(delAid); err != nil {
 			return fmt.Errorf("Error configuring Falcon sensor: %v", err)
 		}
 
@@ -525,7 +525,7 @@ func (fi FalconInstaller) configureSensorImage() error {
 		if fi.SensorConfig.ProvisioningToken != "" {
 			slog.Debug("Re-adding provisioning token")
 			token := []string{"-s", "-f", fmt.Sprintf("--provisioning-token=%s", fi.SensorConfig.ProvisioningToken)}
-			if err := falconctl.Set(fi.OSType, token); err != nil {
+			if err := falconctl.Set(token); err != nil {
 				return fmt.Errorf("Error configuring Falcon sensor: %v", err)
 			}
 		}
@@ -533,7 +533,7 @@ func (fi FalconInstaller) configureSensorImage() error {
 		registryBase := "/Library/Application Support/CrowdStrike/Falcon/registry.base"
 
 		slog.Debug("Unloading Falcon sensor")
-		if err := falconctl.Set(fi.OSType, fi.macosArgHandler("unload")); err != nil {
+		if err := falconctl.Set(fi.macosArgHandler("unload")); err != nil {
 			return fmt.Errorf("Error unloading Falcon sensor: %v", err)
 		}
 
