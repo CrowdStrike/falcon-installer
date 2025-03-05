@@ -119,7 +119,7 @@ func (fc FalconInstaller) uninstallLinuxSensor() error {
 			slog.Debug("Using package manager for uninstallation",
 				"command", cmd, "args", pm.args, "env", pm.envVars)
 
-			stdout, stderr, err := installSensorWithRetry(cmd, pm.envVars[0], pm.args)
+			stdout, stderr, err := installSensorWithRetry(cmd, pm.envVars, pm.args)
 			if err != nil {
 				return fmt.Errorf("failed to uninstall sensor: %w (stdout: %s, stderr: %s)",
 					err, stdout, stderr)
