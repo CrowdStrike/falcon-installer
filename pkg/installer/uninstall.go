@@ -73,84 +73,117 @@ func Uninstall(fc FalconInstaller) {
 			fc.SensorConfig.MaintenanceToken = falcon.GetMaintenanceToken(client, aid)
 		}
 
-		fc.uninstallSensor(fc.SensorConfig.MaintenanceToken)
+		if err := fc.uninstallSensor(fc.SensorConfig.MaintenanceToken); err != nil {
+			log.Fatalf("Error uninstalling Falcon sensor: %v", err)
+		}
 	}
 	slog.Info("Falcon Sensor has been uninstalled")
 }
 
-// installSensor installs the Falcon sensor using the appropriate package manager.
-func (fc FalconInstaller) uninstallSensor(maintenanceToken string) {
-	c := ""
-	env := ""
-	args := []string{} //nolint:staticcheck
+// UninstallSensor uninstalls the Falcon sensor using the appropriate method for the OS.
+func (fc FalconInstaller) uninstallSensor(maintenanceToken string) error {
+	slog.Debug("Starting Falcon sensor uninstallation", "osType", fc.OSType)
 
 	switch fc.OSType {
 	case "linux":
-		sensor := "falcon-sensor"
-
-		if cmd, err := exec.LookPath("/usr/bin/dnf"); err == nil {
-			c = cmd
-			args = []string{"remove", "-q", "-y", sensor}
-		} else if cmd, err := exec.LookPath("/usr/bin/yum"); err == nil {
-			c = cmd
-			args = []string{"remove", "-q", "-y", sensor}
-		} else if cmd, err := exec.LookPath("/usr/bin/zypper"); err == nil {
-			c = cmd
-			args = []string{"remove", "--quiet", "-y", sensor}
-		} else if cmd, err := exec.LookPath("/usr/bin/apt-get"); err == nil {
-			c = cmd
-			args = []string{"purge", "-y", sensor}
-			env = "DEBIAN_FRONTEND=noninteractive"
-		} else if cmd, err := exec.LookPath("/usr/bin/dpkg"); err == nil {
-			c = cmd
-			args = []string{"remove", "--qq", "-y", sensor}
-			env = "DEBIAN_FRONTEND=noninteractive"
-		} else {
-			log.Fatalf("Unable to find expected linux package manager. Unsupported package manager: %v", err)
-		}
-
-		slog.Debug("Uninstall command being used for removal", "Command", c, "Args", args)
-		stdout, stderr, err := installSensorWithRetry(c, env, args)
-		if err != nil {
-			log.Fatalf("Error running %s: %v, stdout: %s, stderr: %s", c, err, string(stdout), string(stderr))
-		}
-
-		slog.Debug("Removing Falcon Sensor", string(stdout), string(stderr))
+		return fc.uninstallLinuxSensor()
 	case "windows":
-		uninstallArgs := []string{"/uninstall", "/quiet"}
-		uninstallRegex := `^((WindowsSensor|FalconSensor_Windows).*\.)(exe)$`
-		dir := "C:\\ProgramData\\Package Cache"
-
-		if maintenanceToken != "" {
-			uninstallArgs = append(uninstallArgs, fmt.Sprintf("MAINTENANCE_TOKEN=%s", maintenanceToken))
-		}
-
-		slog.Debug("Finding the Falcon Sensor uninstaller", "Directory", dir, "Regex", uninstallRegex)
-		uninstaller, err := utils.FindFile(dir, uninstallRegex)
-		if err != nil {
-			log.Fatalf("Error finding the Windows Sensor uninstaller: %v", err)
-		}
-
-		slog.Debug("Running the Falcon Sensor uninstaller", "Uninstaller", uninstaller, "Args", uninstallArgs)
-		stdout, stderr, err := utils.RunCmd(uninstaller, uninstallArgs)
-		if err != nil {
-			log.Fatalf("Error running %s: %v, stdout: %s, stderr: %s", uninstaller, err, string(stdout), string(stderr))
-		}
-
-		slog.Debug("Removing Falcon Sensor")
-	case "macos":
-		if maintenanceToken != "" {
-			slog.Debug("Uninstalling the Falcon Sensor with maintenance token")
-			if err := falconctl.Set(fc.macosArgHandler("uninstall"), falconctl.WithSensorMaintenanceTokenOption(maintenanceToken)); err != nil {
-				log.Fatalf("Error configuring Falcon sensor: %v", err)
-			}
-		} else {
-			slog.Debug("Uninstalling the Falcon Sensor")
-			if err := falconctl.Set(fc.macosArgHandler("uninstall")); err != nil {
-				log.Fatalf("Error configuring Falcon sensor: %v", err)
-			}
-		}
+		return fc.uninstallWindowsSensor(maintenanceToken)
+	case "macos", "darwin":
+		return fc.uninstallMacOSSensor(maintenanceToken)
 	default:
-		log.Fatalf("Unable to begin package installation. Unsupported OS: %s", fc.OSType)
+		return fmt.Errorf("unsupported OS for uninstallation: %s", fc.OSType)
 	}
+}
+
+// uninstallLinuxSensor uninstalls the Falcon sensor on Linux systems.
+func (fc FalconInstaller) uninstallLinuxSensor() error {
+	const sensorPackage = "falcon-sensor"
+
+	// Define package managers in order of preference
+	packageManagers := []struct {
+		path    string
+		args    []string
+		envVars []string
+	}{
+		{"/usr/bin/dnf", []string{"remove", "-q", "-y", sensorPackage}, nil},
+		{"/usr/bin/yum", []string{"remove", "-q", "-y", sensorPackage}, nil},
+		{"/usr/bin/zypper", []string{"remove", "--quiet", "-y", sensorPackage}, nil},
+		{"/usr/bin/apt-get", []string{"purge", "-y", sensorPackage}, []string{"DEBIAN_FRONTEND=noninteractive"}},
+		{"/usr/bin/dpkg", []string{"remove", "--qq", "-y", sensorPackage}, []string{"DEBIAN_FRONTEND=noninteractive"}},
+	}
+
+	// Find the first available package manager
+	for _, pm := range packageManagers {
+		if cmd, err := exec.LookPath(pm.path); err == nil {
+			slog.Debug("Using package manager for uninstallation",
+				"command", cmd, "args", pm.args, "env", pm.envVars)
+
+			stdout, stderr, err := installSensorWithRetry(cmd, pm.envVars[0], pm.args)
+			if err != nil {
+				return fmt.Errorf("failed to uninstall sensor: %w (stdout: %s, stderr: %s)",
+					err, stdout, stderr)
+			}
+
+			slog.Debug("Successfully removed Falcon sensor",
+				"stdout", string(stdout), "stderr", string(stderr))
+			return nil
+		}
+	}
+
+	return fmt.Errorf("no supported package manager found for uninstallation")
+}
+
+// uninstallWindowsSensor uninstalls the Falcon sensor on Windows systems.
+func (fc FalconInstaller) uninstallWindowsSensor(maintenanceToken string) error {
+	const (
+		cacheDir       = "C:\\ProgramData\\Package Cache"
+		uninstallRegex = `^((WindowsSensor|FalconSensor_Windows).*\.)(exe)$`
+	)
+
+	// Prepare uninstall arguments
+	uninstallArgs := []string{"/uninstall", "/quiet"}
+	if maintenanceToken != "" {
+		uninstallArgs = append(uninstallArgs, fmt.Sprintf("MAINTENANCE_TOKEN=%s", maintenanceToken))
+	}
+
+	// Find the uninstaller
+	slog.Debug("Finding the Falcon Sensor uninstaller", "directory", cacheDir, "regex", uninstallRegex)
+	uninstaller, err := utils.FindFile(cacheDir, uninstallRegex)
+	if err != nil {
+		return fmt.Errorf("failed to find Windows sensor uninstaller: %w", err)
+	}
+
+	// Run the uninstaller
+	slog.Debug("Running the Falcon Sensor uninstaller",
+		"uninstaller", uninstaller, "args", uninstallArgs)
+
+	stdout, stderr, err := utils.RunCmd(uninstaller, uninstallArgs)
+	if err != nil {
+		return fmt.Errorf("failed to uninstall sensor: %w (stdout: %s, stderr: %s)",
+			err, string(stdout), string(stderr))
+	}
+
+	return nil
+}
+
+// uninstallMacOSSensor uninstalls the Falcon sensor on macOS systems.
+func (fc FalconInstaller) uninstallMacOSSensor(maintenanceToken string) error {
+	args := fc.macosArgHandler("uninstall")
+
+	slog.Debug("Uninstalling the Falcon Sensor",
+		"withMaintenanceToken", maintenanceToken != "")
+
+	var err error
+	if maintenanceToken != "" {
+		err = falconctl.Set(args, falconctl.WithSensorMaintenanceTokenOption(maintenanceToken))
+	} else {
+		err = falconctl.Set(args)
+	}
+
+	if err != nil {
+		return fmt.Errorf("failed to uninstall sensor: %w", err)
+	}
+
+	return nil
 }
