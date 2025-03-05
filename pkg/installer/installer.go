@@ -194,7 +194,10 @@ func Run(fc FalconInstaller) {
 		path := falcon.SensorDownload(client, sensor, fc.TmpDir, *sensor.Name)
 
 		slog.Info("Starting Falcon sensor installation")
-		fc.installSensor(path)
+		err = fc.installSensor(path)
+		if err != nil {
+			log.Fatalf("Error installing Falcon sensor: %v", err)
+		}
 	} else {
 		slog.Info("Sensor is already installed. Skipping download and installation")
 	}
@@ -377,64 +380,90 @@ func (fi FalconInstaller) macosArgHandler(command string) []string {
 	return cli
 }
 
-// installSensor installs the Falcon sensor using the appropriate package manager.
-func (fi FalconInstaller) installSensor(path string) {
-	c := ""
-	env := ""
-	args := []string{} //nolint:staticcheck
+// InstallSensor installs the Falcon sensor using the appropriate method for the OS.
+func (fi FalconInstaller) installSensor(path string) error {
+	slog.Debug("Starting Falcon sensor installation", "osType", fi.OSType, "path", path)
 
 	switch fi.OSType {
 	case "linux":
-		if cmd, err := exec.LookPath("/usr/bin/dnf"); err == nil {
-			c = cmd
-			args = []string{"install", "-q", "-y", path}
-		} else if cmd, err := exec.LookPath("/usr/bin/yum"); err == nil {
-			c = cmd
-			args = []string{"install", "-q", "-y", path}
-		} else if cmd, err := exec.LookPath("/usr/bin/zypper"); err == nil {
-			c = cmd
-			args = []string{"install", "--quiet", "-y", path}
-		} else if cmd, err := exec.LookPath("/usr/bin/apt-get"); err == nil {
-			c = cmd
-			args = []string{"install", "-y", path}
-			env = "DEBIAN_FRONTEND=noninteractive"
-		} else if cmd, err := exec.LookPath("/usr/bin/dpkg"); err == nil {
-			c = cmd
-			args = []string{"install", "--qq", "-y", path}
-			env = "DEBIAN_FRONTEND=noninteractive"
-		} else {
-			log.Fatalf("Unable to find expected linux package manager. Unsupported package manager: %v", err)
-		}
-
-		slog.Debug("Install command being used for installation", "Command", c, "Args", args)
-		stdout, stderr, err := installSensorWithRetry(c, env, args)
-		if err != nil {
-			log.Fatalf("Error running %s: %v, stdout: %s, stderr: %s", c, err, string(stdout), string(stderr))
-		}
-
-		slog.Debug("Installing Falcon Sensor", string(stdout), string(stderr))
+		return fi.installLinuxSensor(path)
 	case "windows":
-		stdout, stderr, err := utils.RunCmd(path, fi.falconArgs())
-		if err != nil {
-			log.Fatalf("Error running %s: %v, stdout: %s, stderr: %s", path, err, string(stdout), string(stderr))
-		}
-
-		slog.Debug("Installing Falcon Sensor")
-	case "macos":
-		c = "/usr/sbin/installer"
-		args = []string{"-verboseR", "-pkg", path, "-target", "/"}
-
-		stdout, stderr, err := utils.RunCmd(c, args, utils.WithCmdEnvOption([]string{env}))
-		if err != nil {
-			log.Fatalf("Error running %s: %v, stdout: %s, stderr: %s", c, err, string(stdout), string(stderr))
-		}
+		return fi.installWindowsSensor(path)
+	case "macos", "darwin":
+		return fi.installMacOSSensor(path)
 	default:
-		log.Fatalf("Unable to begin package installation. Unsupported OS: %s", fi.OSType)
+		return fmt.Errorf("unsupported OS for installation: %s", fi.OSType)
 	}
 }
 
+// installLinuxSensor installs the Falcon sensor on Linux systems.
+func (fi FalconInstaller) installLinuxSensor(path string) error {
+	// Define package managers in order of preference
+	packageManagers := []struct {
+		path    string
+		args    []string
+		envVars []string
+	}{
+		{"/usr/bin/dnf", []string{"install", "-q", "-y", path}, nil},
+		{"/usr/bin/yum", []string{"install", "-q", "-y", path}, nil},
+		{"/usr/bin/zypper", []string{"install", "--quiet", "-y", path}, nil},
+		{"/usr/bin/apt-get", []string{"install", "-y", path}, []string{"DEBIAN_FRONTEND=noninteractive"}},
+		{"/usr/bin/dpkg", []string{"install", "--qq", "-y", path}, []string{"DEBIAN_FRONTEND=noninteractive"}},
+	}
+
+	// Find the first available package manager
+	for _, pm := range packageManagers {
+		if cmd, err := exec.LookPath(pm.path); err == nil {
+			slog.Debug("Using package manager for installation",
+				"command", cmd, "args", pm.args, "env", pm.envVars)
+
+			stdout, stderr, err := installSensorWithRetry(cmd, pm.envVars, pm.args)
+			if err != nil {
+				return fmt.Errorf("failed to install sensor: %w (stdout: %s, stderr: %s)",
+					err, stdout, stderr)
+			}
+
+			slog.Debug("Successfully installed Falcon sensor",
+				"stdout", string(stdout), "stderr", string(stderr))
+			return nil
+		}
+	}
+
+	return fmt.Errorf("no supported package manager found for installation")
+}
+
+// installWindowsSensor installs the Falcon sensor on Windows systems.
+func (fi FalconInstaller) installWindowsSensor(path string) error {
+	slog.Debug("Installing Falcon sensor on Windows", "installer", path, "args", fi.falconArgs())
+
+	stdout, stderr, err := utils.RunCmd(path, fi.falconArgs())
+	if err != nil {
+		return fmt.Errorf("failed to install sensor: %w (stdout: %s, stderr: %s)",
+			err, string(stdout), string(stderr))
+	}
+
+	return nil
+}
+
+// installMacOSSensor installs the Falcon sensor on macOS systems.
+func (fi FalconInstaller) installMacOSSensor(path string) error {
+	const installerPath = "/usr/sbin/installer"
+	args := []string{"-verboseR", "-pkg", path, "-target", "/"}
+
+	slog.Debug("Installing Falcon sensor on macOS",
+		"command", installerPath, "args", args)
+
+	stdout, stderr, err := utils.RunCmd(installerPath, args)
+	if err != nil {
+		return fmt.Errorf("failed to install sensor: %w (stdout: %s, stderr: %s)",
+			err, string(stdout), string(stderr))
+	}
+
+	return nil
+}
+
 // installSensorWithRetry attempts to install the sensor every 5 seconds for 10 minutes.
-func installSensorWithRetry(c string, env string, args []string) ([]byte, []byte, error) {
+func installSensorWithRetry(c string, env []string, args []string) ([]byte, []byte, error) {
 	const maxRetries = 120
 	const retryInterval = 5 * time.Second
 
@@ -445,7 +474,7 @@ func installSensorWithRetry(c string, env string, args []string) ([]byte, []byte
 		}
 
 		if !lock {
-			stdout, stderr, err := utils.RunCmd(c, args, utils.WithCmdEnvOption([]string{env}))
+			stdout, stderr, err := utils.RunCmd(c, args, utils.WithCmdEnvOption(env))
 			if err != nil {
 				return stdout, stderr, err
 			}
