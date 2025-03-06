@@ -143,9 +143,6 @@ func (fc FalconInstaller) uninstallWindowsSensor(maintenanceToken string) error 
 
 	// Prepare uninstall arguments
 	uninstallArgs := []string{"/uninstall", "/quiet"}
-	if maintenanceToken != "" {
-		uninstallArgs = append(uninstallArgs, fmt.Sprintf("MAINTENANCE_TOKEN=%s", maintenanceToken))
-	}
 
 	// Find the uninstaller
 	slog.Debug("Finding the Falcon Sensor uninstaller", "directory", cacheDir, "regex", uninstallRegex)
@@ -154,10 +151,15 @@ func (fc FalconInstaller) uninstallWindowsSensor(maintenanceToken string) error 
 		return fmt.Errorf("failed to find Windows sensor uninstaller: %w", err)
 	}
 
-	// Run the uninstaller
-	slog.Debug("Running the Falcon Sensor uninstaller",
-		"uninstaller", uninstaller, "args", uninstallArgs)
+	slog.Debug("Running the Falcon Sensor uninstaller", "uninstaller", uninstaller, "args",
+		uninstallArgs, "withMaintenanceToken", maintenanceToken != "")
 
+	// Add the maintenance token to the uninstall arguments after the Debug logs are printed so that maintenanceToken is not logged
+	if maintenanceToken != "" {
+		uninstallArgs = append(uninstallArgs, fmt.Sprintf("MAINTENANCE_TOKEN=%s", maintenanceToken))
+	}
+
+	// Run the uninstaller
 	stdout, stderr, err := utils.RunCmd(uninstaller, uninstallArgs)
 	if err != nil {
 		return fmt.Errorf("failed to uninstall sensor: %w (stdout: %s, stderr: %s)",
@@ -169,7 +171,7 @@ func (fc FalconInstaller) uninstallWindowsSensor(maintenanceToken string) error 
 
 // uninstallMacOSSensor uninstalls the Falcon sensor on macOS systems.
 func (fc FalconInstaller) uninstallMacOSSensor(maintenanceToken string) error {
-	args := fc.macosArgHandler("uninstall")
+	args := fc.buildMacOSArgs("uninstall")
 
 	slog.Debug("Uninstalling the Falcon Sensor",
 		"withMaintenanceToken", maintenanceToken != "")
