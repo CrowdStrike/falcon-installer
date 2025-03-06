@@ -30,7 +30,6 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
-	"strconv"
 	"strings"
 	"time"
 
@@ -142,13 +141,13 @@ func Run(fc FalconInstaller) {
 		log.Fatalf("Error creating Falcon client: %v", err)
 	}
 
-	falconArgs := fc.falconArgs()
+	falconArgs := fc.buildInstallerArgs()
 
 	// Get the provisioning token from the API if not provided
 	if fc.SensorConfig.ProvisioningToken == "" {
 		fc.SensorConfig.ProvisioningToken = falcon.GetProvisioningToken(client)
 		if fc.SensorConfig.ProvisioningToken != "" {
-			falconArgs = append(falconArgs, fc.osArgHandler("provisioning-token", fc.SensorConfig.ProvisioningToken))
+			falconArgs = append(falconArgs, fc.formatArg("provisioning-token", fc.SensorConfig.ProvisioningToken))
 		}
 	}
 
@@ -181,7 +180,7 @@ func Run(fc FalconInstaller) {
 				log.Fatalf("Error getting Falcon CID: %v", err)
 			}
 			slog.Debug("Found suitable Falcon Customer ID (CID)", "CID", fc.SensorConfig.CID)
-			falconArgs = append(falconArgs, fc.osArgHandler("cid", fc.SensorConfig.CID))
+			falconArgs = append(falconArgs, fc.formatArg("cid", fc.SensorConfig.CID))
 		}
 
 		// Query the CrowdStrike API for a suitable Falcon sensor
@@ -220,26 +219,26 @@ func Run(fc FalconInstaller) {
 		}
 	case "macos":
 		if !falconInstalled {
-			if err := falconctl.Set(fc.macosArgHandler("license")); err != nil {
+			if err := falconctl.Set(fc.buildMacOSArgs("license")); err != nil {
 				if !strings.Contains(err.Error(), "Computer needs to be rebooted first") {
 					log.Fatalf("Error configuring Falcon sensor: %v", err)
 				}
 
 				slog.Debug("Loading Falcon sensor kernel extension")
-				if err := falconctl.Set(fc.macosArgHandler("load")); err != nil {
+				if err := falconctl.Set(fc.buildMacOSArgs("load")); err != nil {
 					log.Fatalf("Error configuring Falcon sensor: %v", err)
 				}
 			}
 		} else if fc.SensorConfig.Tags != "" {
-			if err := falconctl.Set(fc.macosArgHandler("grouping-tags")); err != nil {
+			if err := falconctl.Set(fc.buildMacOSArgs("grouping-tags")); err != nil {
 				log.Fatalf("Error configuring Falcon sensor: %v", err)
 			}
 
-			if err := falconctl.Set(fc.macosArgHandler("unload")); err != nil {
+			if err := falconctl.Set(fc.buildMacOSArgs("unload")); err != nil {
 				log.Fatalf("Error configuring Falcon sensor: %v", err)
 			}
 
-			if err := falconctl.Set(fc.macosArgHandler("load")); err != nil {
+			if err := falconctl.Set(fc.buildMacOSArgs("load")); err != nil {
 				log.Fatalf("Error configuring Falcon sensor: %v", err)
 			}
 		} else {
@@ -261,87 +260,107 @@ func Run(fc FalconInstaller) {
 	}
 }
 
-// falconArgs returns the arguments for the Falcon sensor installer based on the OS.
-func (fi FalconInstaller) falconArgs() []string {
-	falconArgs := []string{}
+// buildInstallerArgs returns the arguments for the Falcon sensor installer based on the OS.
+func (fi FalconInstaller) buildInstallerArgs() []string {
+	// Start with OS-specific base arguments
+	args := fi.getBaseInstallerArgs()
 
+	// Add common configuration arguments
+	args = fi.addCommonConfigArgs(args)
+
+	// Add proxy configuration arguments
+	args = fi.addProxyConfigArgs(args)
+
+	return args
+}
+
+// getBaseInstallerArgs returns the base arguments specific to each OS.
+func (fi FalconInstaller) getBaseInstallerArgs() []string {
 	switch fi.OSType {
 	case "linux":
-		falconArgs = []string{"-sf"}
+		return []string{"-sf"}
 	case "windows":
-		falconArgs = []string{"/install", "/quiet"}
+		args := []string{"/install", "/quiet"}
 
+		// Add Windows-specific options
 		if !fi.SensorConfig.Restart {
-			falconArgs = append(falconArgs, "/norestart")
+			args = append(args, "/norestart")
 		}
 
 		if fi.SensorConfig.ProvisioningWaitTime != 0 {
-			falconArgs = append(falconArgs, fmt.Sprintf("ProvWaitTime=%d", fi.SensorConfig.ProvisioningWaitTime))
+			args = append(args, fmt.Sprintf("ProvWaitTime=%d", fi.SensorConfig.ProvisioningWaitTime))
 		}
 
 		if fi.SensorConfig.DisableProvisioningWait {
-			falconArgs = append(falconArgs, "ProvNoWait=1")
+			args = append(args, "ProvNoWait=1")
 		}
 
 		if fi.SensorConfig.NoStart {
-			falconArgs = append(falconArgs, "NoStart=1")
+			args = append(args, "NoStart=1")
 		}
 
 		if fi.SensorConfig.VDI {
-			falconArgs = append(falconArgs, "VDI=1")
+			args = append(args, "VDI=1")
 		}
 
 		if fi.SensorConfig.PACURL != "" {
-			falconArgs = append(falconArgs, fmt.Sprintf("PACURL=%s", fi.SensorConfig.PACURL))
-		}
-	}
-
-	if fi.SensorConfig.CID != "" {
-		falconArgs = append(falconArgs, fi.osArgHandler("cid", fi.SensorConfig.CID))
-	}
-
-	if fi.SensorConfig.ProvisioningToken != "" {
-		falconArgs = append(falconArgs, fi.osArgHandler("provisioning-token", fi.SensorConfig.ProvisioningToken))
-	}
-
-	if fi.SensorConfig.Tags != "" {
-		falconArgs = append(falconArgs, fi.osArgHandler("tags", fi.SensorConfig.Tags))
-	}
-
-	if fi.SensorConfig.ProxyDisable || fi.SensorConfig.ProxyHost != "" || fi.SensorConfig.ProxyPort != "" {
-		// apd = "true" for Linux, PROXYDISABLE=1 for Windows, default is empty to use the sensor's default setting.
-		// For Windows, PROXYDISABLE=0 is not needed because the default is to have the proxy enabled.
-		// For Linux, the default is to have the proxy unset.
-		val := ""
-
-		switch fi.OSType {
-		case "windows":
-			// Windows default is to have the proxy enabled.
-			if fi.SensorConfig.ProxyDisable {
-				val = fmt.Sprintf("%d", utils.BoolToInt(fi.SensorConfig.ProxyDisable))
-			}
-		case "linux":
-			val = strconv.FormatBool(fi.SensorConfig.ProxyDisable)
+			args = append(args, fmt.Sprintf("PACURL=%s", fi.SensorConfig.PACURL))
 		}
 
-		if val != "" {
-			falconArgs = append(falconArgs, fi.osArgHandler("apd", val))
-		}
+		return args
+	default:
+		return []string{}
 	}
-
-	if fi.SensorConfig.ProxyHost != "" {
-		falconArgs = append(falconArgs, fi.osArgHandler("aph", fi.SensorConfig.ProxyHost))
-	}
-
-	if fi.SensorConfig.ProxyPort != "" {
-		falconArgs = append(falconArgs, fi.osArgHandler("app", fi.SensorConfig.ProxyPort))
-	}
-
-	return falconArgs
 }
 
-// osArgHandler handles the formatting of arguments for the Falcon sensor installer based on the OS.
-func (fi FalconInstaller) osArgHandler(arg, val string) string {
+// addCommonConfigArgs adds configuration arguments common to all platforms.
+func (fi FalconInstaller) addCommonConfigArgs(args []string) []string {
+	// Add CID if provided
+	if fi.SensorConfig.CID != "" {
+		args = append(args, fi.formatArg("cid", fi.SensorConfig.CID))
+	}
+
+	// Add provisioning token if provided
+	if fi.SensorConfig.ProvisioningToken != "" {
+		args = append(args, fi.formatArg("provisioning-token", fi.SensorConfig.ProvisioningToken))
+	}
+
+	// Add tags if provided
+	if fi.SensorConfig.Tags != "" {
+		args = append(args, fi.formatArg("tags", fi.SensorConfig.Tags))
+	}
+
+	return args
+}
+
+// addProxyConfigArgs adds proxy configuration arguments.
+func (fi FalconInstaller) addProxyConfigArgs(args []string) []string {
+	// Handle proxy disable flag
+	// Handle proxy disable differently per OS
+	if fi.SensorConfig.ProxyDisable {
+		switch fi.OSType {
+		case "windows":
+			args = append(args, fi.formatArg("apd", "1"))
+		case "linux":
+			args = append(args, fi.formatArg("apd", "true"))
+		}
+	} else {
+		// Add proxy host if provided
+		if fi.SensorConfig.ProxyHost != "" {
+			args = append(args, fi.formatArg("aph", fi.SensorConfig.ProxyHost))
+		}
+
+		// Add proxy port if provided
+		if fi.SensorConfig.ProxyPort != "" {
+			args = append(args, fi.formatArg("app", fi.SensorConfig.ProxyPort))
+		}
+	}
+
+	return args
+}
+
+// formatArg formats an argument based on the OS.
+func (fi FalconInstaller) formatArg(arg, val string) string {
 	switch fi.OSType {
 	case "windows":
 		return fmt.Sprintf("%s=%s", windowsFalconArgMap[arg], val)
@@ -350,37 +369,39 @@ func (fi FalconInstaller) osArgHandler(arg, val string) string {
 	}
 }
 
-// macosArgHandler handles the formatting of arguments for the Falcon sensor installer on macOS since for some reason it is completely different.
-func (fi FalconInstaller) macosArgHandler(command string) []string {
-	cli := []string{}
-	mTokenSupport := false
+// buildMacOSArgs builds arguments for macOS-specific commands.
+func (fi FalconInstaller) buildMacOSArgs(command string) []string {
+	var args []string
+	requiresMaintenanceToken := false
+
 	switch command {
 	case "load":
-		cli = append(cli, "load")
+		args = []string{"load"}
 	case "unload":
-		cli = append(cli, "unload")
-		mTokenSupport = true
+		args = []string{"unload"}
+		requiresMaintenanceToken = true
 	case "uninstall":
-		cli = append(cli, "uninstall")
-		mTokenSupport = true
+		args = []string{"uninstall"}
+		requiresMaintenanceToken = true
 	case "license":
-		cli = append(cli, "license", fi.SensorConfig.CID)
+		args = []string{"license", fi.SensorConfig.CID}
 		if fi.SensorConfig.ProvisioningToken != "" {
-			cli = append(cli, fi.SensorConfig.ProvisioningToken)
+			args = append(args, fi.SensorConfig.ProvisioningToken)
 		}
 	case "grouping-tags":
-		cli = append(cli, "grouping-tags", "set", fi.SensorConfig.Tags)
-		mTokenSupport = true
+		args = []string{"grouping-tags", "set", fi.SensorConfig.Tags}
+		requiresMaintenanceToken = true
 	}
 
-	if fi.SensorConfig.MaintenanceToken != "" && mTokenSupport {
-		cli = append(cli, "--maintenance-token")
+	// Add maintenance token flag if needed and available
+	if fi.SensorConfig.MaintenanceToken != "" && requiresMaintenanceToken {
+		args = append(args, "--maintenance-token")
 	}
 
-	return cli
+	return args
 }
 
-// InstallSensor installs the Falcon sensor using the appropriate method for the OS.
+// installSensor installs the Falcon sensor using the appropriate method for the OS.
 func (fi FalconInstaller) installSensor(path string) error {
 	slog.Debug("Starting Falcon sensor installation", "osType", fi.OSType, "path", path)
 
@@ -434,9 +455,10 @@ func (fi FalconInstaller) installLinuxSensor(path string) error {
 
 // installWindowsSensor installs the Falcon sensor on Windows systems.
 func (fi FalconInstaller) installWindowsSensor(path string) error {
-	slog.Debug("Installing Falcon sensor on Windows", "installer", path, "args", fi.falconArgs())
+	falconArgs := fi.buildInstallerArgs()
+	slog.Debug("Installing Falcon sensor on Windows", "installer", path, "args", falconArgs)
 
-	stdout, stderr, err := utils.RunCmd(path, fi.falconArgs())
+	stdout, stderr, err := utils.RunCmd(path, falconArgs)
 	if err != nil {
 		return fmt.Errorf("failed to install sensor: %w (stdout: %s, stderr: %s)",
 			err, string(stdout), string(stderr))
@@ -562,7 +584,7 @@ func (fi FalconInstaller) configureSensorImage() error {
 		registryBase := "/Library/Application Support/CrowdStrike/Falcon/registry.base"
 
 		slog.Debug("Unloading Falcon sensor")
-		if err := falconctl.Set(fi.macosArgHandler("unload")); err != nil {
+		if err := falconctl.Set(fi.buildMacOSArgs("unload")); err != nil {
 			return fmt.Errorf("Error unloading Falcon sensor: %v", err)
 		}
 
