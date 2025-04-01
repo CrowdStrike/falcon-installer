@@ -40,7 +40,6 @@ jobs:
       - name: Run linters
         uses: golangci/golangci-lint-action@1481404843c368bc19ca9406f87d6e0fc97bdcfd # v7.0.0
         with:
-          args: --out-format=colored-line-number
           version: latest
 
   build:
