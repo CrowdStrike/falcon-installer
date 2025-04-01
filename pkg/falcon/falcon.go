@@ -48,14 +48,14 @@ func GetCID(ctx context.Context, client *client.CrowdStrikeAPISpecification) (st
 		Context: ctx,
 	})
 	if err != nil {
-		return "", fmt.Errorf("Could not get Falcon CID from CrowdStrike Falcon API: %v", err)
+		return "", fmt.Errorf("could not get Falcon CID from CrowdStrike Falcon API: %v", err)
 	}
 	payload := response.GetPayload()
 	if err = falcon.AssertNoError(payload.Errors); err != nil {
-		return "", fmt.Errorf("Error reported when getting Falcon CID from CrowdStrike Falcon API: %v", err)
+		return "", fmt.Errorf("error reported when getting Falcon CID from CrowdStrike Falcon API: %v", err)
 	}
 	if len(payload.Resources) != 1 {
-		return "", fmt.Errorf("Failed to get Falcon CID: Unexpected API response: %v", payload.Resources)
+		return "", fmt.Errorf("failed to get Falcon CID: Unexpected API response: %v", payload.Resources)
 	}
 	return payload.Resources[0], nil
 

@@ -1,4 +1,4 @@
-// MIT License
+// MIT License// MIT License
 //
 // Copyright (c) 2024 CrowdStrike
 //
@@ -261,56 +261,56 @@ func preRunValidation(cmd *cobra.Command) error {
 
 	// ClientID and ClientSecret cannot be set when Access Token is provided
 	if cmd.Flags().Changed("access-token") && (cmd.Flags().Changed("client-id") || cmd.Flags().Changed("client-secret")) {
-		return fmt.Errorf("Cannot specify Client ID or Client Secret when Access Token is provided")
+		return fmt.Errorf("cannot specify Client ID or Client Secret when Access Token is provided")
 	}
 
 	// Region must be specified when using Access Token
 	if cmd.Flags().Changed("access-token") && !cmd.Flags().Changed("cloud") {
-		return fmt.Errorf("Cloud region must be specified when using Access Token")
+		return fmt.Errorf("the Cloud region must be specified when using Access Token")
 	}
 
 	if !cmd.Flags().Changed("access-token") && !cmd.Flags().Changed("client-id") && !viper.IsSet("client_id") {
-		return fmt.Errorf("Client ID must be specified. See https://falcon.crowdstrike.com/api-clients-and-keys/clients to create or update OAuth2 credentials")
+		return fmt.Errorf("the Client ID must be specified. See https://falcon.crowdstrike.com/api-clients-and-keys/clients to create or update OAuth2 credentials")
 	}
 
 	if !cmd.Flags().Changed("access-token") && !cmd.Flags().Changed("client-secret") && !viper.IsSet("client_secret") {
-		return fmt.Errorf("Client Secret must be specified. See https://falcon.crowdstrike.com/api-clients-and-keys/clients to create or update OAuth2 credentials")
+		return fmt.Errorf("the Client Secret must be specified. See https://falcon.crowdstrike.com/api-clients-and-keys/clients to create or update OAuth2 credentials")
 	}
 
 	if cmd.Flags().Changed("client-id") && viper.GetString("client-id") == "" {
-		return fmt.Errorf("Client ID cannot be empty")
+		return fmt.Errorf("the Client ID cannot be empty")
 	}
 
 	if cmd.Flags().Changed("client-secret") && viper.GetString("client-secret") == "" {
-		return fmt.Errorf("Client Secret cannot be empty")
+		return fmt.Errorf("the Client Secret cannot be empty")
 	}
 
 	if err := inputValidation(viper.GetString("client-id"), "^[a-zA-Z0-9]{32}$"); err != nil {
-		return fmt.Errorf("Invalid OAuth Client ID format: %v", err)
+		return fmt.Errorf("invalid OAuth Client ID format: %v", err)
 	}
 
 	if err := inputValidation(viper.GetString("client-secret"), "^[a-zA-Z0-9]{40}$"); err != nil {
-		return fmt.Errorf("Invalid OAuth Client Secret format: %v", err)
+		return fmt.Errorf("invalid OAuth Client Secret format: %v", err)
 	}
 
 	if err := inputValidation(viper.GetString("cid"), "^[0-9a-fA-F]{32}-[0-9a-fA-F]{2}$"); err != nil {
-		return fmt.Errorf("Invalid CID format: %v", err)
+		return fmt.Errorf("invalid CID format: %v", err)
 	}
 
 	if err := inputValidation(viper.GetString("member_cid"), "^[0-9a-fA-F]{32}-[0-9a-fA-F]{2}$"); err != nil {
-		return fmt.Errorf("Invalid member CID format: %v", err)
+		return fmt.Errorf("invalid member CID format: %v", err)
 	}
 
 	if err := inputValidation(viper.GetString("cloud"), "^(autodiscover|us-1|us-2|eu-1|us-gov-1|gov1)$"); err != nil {
-		return fmt.Errorf("Invalid cloud region: %v", err)
+		return fmt.Errorf("invalid cloud region: %v", err)
 	}
 
 	if err := inputValidation(viper.GetString("tags"), "^[a-zA-Z0-9,_/-]+$"); err != nil {
-		return fmt.Errorf("Invalid Falcon Sensor tag format: %v", err)
+		return fmt.Errorf("invalid Falcon Sensor tag format: %v", err)
 	}
 
 	if fc.ProxyDisable && (fc.ProxyHost != "" || fc.ProxyPort != "") {
-		return fmt.Errorf("Cannot specify proxy host or port when using --disable-proxy")
+		return fmt.Errorf("cannot specify proxy host or port when using --disable-proxy")
 	}
 
 	return nil
@@ -360,7 +360,7 @@ func inputValidation(input, pattern string) error {
 	}
 
 	if !regexp.MustCompile(pattern).MatchString(input) {
-		return fmt.Errorf("Pattern does not match: %s", pattern)
+		return fmt.Errorf("pattern does not match: %s", pattern)
 	}
 	return nil
 }

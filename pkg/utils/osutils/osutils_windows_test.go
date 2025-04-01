@@ -62,7 +62,7 @@ func TestWinFalconInstalled(t *testing.T) {
 func TestWinRunningWithPrivileges(t *testing.T) {
 	got, err := RunningWithPrivileges("windows")
 	if err != nil {
-		if err.Error() != "You must run this program as an Administrator" {
+		if err.Error() != "you must run this program as an Administrator" {
 			t.Error(err)
 		}
 	}

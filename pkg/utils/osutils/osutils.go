@@ -51,20 +51,20 @@ func FalconInstalled(targetOS string) (bool, error) {
 
 		falconInstalled, err := packageManagerQuery(pkgName)
 		if err != nil {
-			return falconInstalled, fmt.Errorf("Error querying package manager: %v", err)
+			return falconInstalled, fmt.Errorf("error querying package manager: %v", err)
 		}
 
 		return falconInstalled, nil
 	case "windows":
 		falconInstalled, err := scQuery("csagent")
 		if err != nil {
-			return falconInstalled, fmt.Errorf("Error querying service manager: %v", err)
+			return falconInstalled, fmt.Errorf("error querying service manager: %v", err)
 		}
 
 		return falconInstalled, nil
 	}
 
-	return falconInstalled, fmt.Errorf("Unable to determine if Falcon Sensor is installed and running. Unsupported OS: %s", targetOS)
+	return falconInstalled, fmt.Errorf("unable to determine if Falcon Sensor is installed and running. Unsupported OS: %s", targetOS)
 }
 
 // RunningWithPrivileges checks if the program is running with root/admin privileges.
@@ -73,19 +73,19 @@ func RunningWithPrivileges(targetOS string) (bool, error) {
 	case "linux", "macos":
 		user := os.Getuid()
 		if user != 0 {
-			return false, fmt.Errorf("You must run this program as root")
+			return false, fmt.Errorf("you must run this program as root")
 		}
 
 		return true, nil
 	case "windows":
 		if !isWindowsAdmin() {
-			return false, fmt.Errorf("You must run this program as an Administrator")
+			return false, fmt.Errorf("you must run this program as an Administrator")
 		}
 
 		return true, nil
 	}
 
-	return false, fmt.Errorf("Cannot check if running as a privileged user. Unsupported OS: %s", targetOS)
+	return false, fmt.Errorf("cannot check if running as a privileged user. Unsupported OS: %s", targetOS)
 }
 
 // IsWindowsAdmin checks if the user is running as an Administrator on Windows.
@@ -101,7 +101,7 @@ func ReadEtcRelease(targetOS string) (osName, osVersion string, err error) {
 		linuxOsRelease := "/etc/os-release"
 		data, err := os.ReadFile(linuxOsRelease)
 		if err != nil {
-			return "", "", fmt.Errorf("Error reading %s: %w", linuxOsRelease, err)
+			return "", "", fmt.Errorf("error reading %s: %w", linuxOsRelease, err)
 		}
 
 		for _, line := range strings.Split(string(data), "\n") {
@@ -118,7 +118,7 @@ func ReadEtcRelease(targetOS string) (osName, osVersion string, err error) {
 	case "macos":
 		return "macos", "", nil
 	default:
-		return "", "", fmt.Errorf("Unable to determine operating system. Unsupported OS: %s", targetOS)
+		return "", "", fmt.Errorf("unable to determine operating system. Unsupported OS: %s", targetOS)
 	}
 }
 
@@ -138,7 +138,7 @@ func PackageManagerLock() (bool, error) {
 func isLockFileInUse(lockFile string) (bool, error) {
 	procDirs, err := os.ReadDir("/proc")
 	if err != nil {
-		return false, fmt.Errorf("Error reading /proc: %v", err)
+		return false, fmt.Errorf("error reading /proc: %v", err)
 	}
 
 	for _, procDir := range procDirs {
@@ -195,7 +195,7 @@ func packageManagerQuery(name string) (bool, error) {
 		return pkg, nil
 	}
 
-	return false, fmt.Errorf("Unsupported package manager for package query")
+	return false, fmt.Errorf("unsupported package manager for package query")
 }
 
 // scQuery queries the Windows service manager for the presence of a service.
@@ -203,7 +203,7 @@ func scQuery(name string) (bool, error) {
 	var err error
 	cmd, err := exec.LookPath(scQueryCmnd)
 	if err != nil {
-		return false, fmt.Errorf("Unable to find sc.exe: %v", err)
+		return false, fmt.Errorf("unable to find sc.exe: %v", err)
 	}
 
 	args := []string{"query", name}
@@ -211,7 +211,7 @@ func scQuery(name string) (bool, error) {
 		if strings.Contains(string(stdout), "The specified service does not exist as an installed service") {
 			return false, nil
 		}
-		return false, fmt.Errorf("Error running sc query: %v", err)
+		return false, fmt.Errorf("error running sc query: %v", err)
 	}
 
 	return true, nil

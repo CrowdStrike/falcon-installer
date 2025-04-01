@@ -38,7 +38,7 @@ func TestRestartService(t *testing.T) {
 	serviceName := "myservice"
 	systemctlCmd = "noSystemCtl"
 	err := RestartService(serviceName)
-	if !strings.Contains(err.Error(), "Could not find systemctl") {
+	if !strings.Contains(err.Error(), "could not find systemctl") {
 		t.Errorf("Unexpected error: %v", err)
 	}
 
@@ -48,8 +48,8 @@ func TestRestartService(t *testing.T) {
 	skipSystemdTests(t)
 
 	err = RestartService(serviceName)
-	errNoSystemctl := "Could not find systemctl: /usr/bin/systemctl"
-	errRestartService := "Error restarting service myservice"
+	errNoSystemctl := "could not find systemctl: /usr/bin/systemctl"
+	errRestartService := "error restarting service myservice"
 	if !strings.Contains(err.Error(), errNoSystemctl) && !strings.Contains(err.Error(), errRestartService) {
 		t.Errorf("Unexpected error: %v", err)
 	}

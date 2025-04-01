@@ -45,7 +45,7 @@ func Query(name string) (bool, error) {
 		if len(string(stderr)) < 1 {
 			return false, nil
 		}
-		return false, fmt.Errorf("Error running pkgutil --pkgs: %s", string(stderr))
+		return false, fmt.Errorf("error running pkgutil --pkgs: %s", string(stderr))
 	}
 
 	return true, nil
