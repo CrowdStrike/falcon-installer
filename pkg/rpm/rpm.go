@@ -38,7 +38,7 @@ func Query(name string) (bool, error) {
 		if strings.Contains(string(stdout), "is not installed") {
 			return false, nil
 		}
-		return false, fmt.Errorf("Error running rpm query: %v", err)
+		return false, fmt.Errorf("error running rpm query: %v", err)
 	}
 
 	return true, nil
@@ -55,7 +55,7 @@ func IsRpmInstalled() bool {
 // GpgKeyImport imports a gpg key into the rpm keyring.
 func GpgKeyImport(gpgKeyFile string) error {
 	if _, _, err := utils.RunCmd(rpmCmd, []string{"--import", gpgKeyFile}); err != nil {
-		return fmt.Errorf("Error running rpm gpg key import: %v", err)
+		return fmt.Errorf("error running rpm gpg key import: %v", err)
 	}
 
 	return nil

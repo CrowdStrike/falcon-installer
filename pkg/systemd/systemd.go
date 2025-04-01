@@ -34,11 +34,11 @@ var systemctlCmd = "systemctl"
 // RestartService restarts a systemd service.
 func RestartService(name string) error {
 	if systemctlCmd, err := exec.LookPath(systemctlCmd); err != nil {
-		return fmt.Errorf("Could not find systemctl: %s, %v", systemctlCmd, err)
+		return fmt.Errorf("could not find systemctl: %s, %v", systemctlCmd, err)
 	}
 
 	if _, _, err := utils.RunCmd(systemctlCmd, []string{"restart", name}); err != nil {
-		return fmt.Errorf("Error restarting service %s: %v", name, err)
+		return fmt.Errorf("error restarting service %s: %v", name, err)
 	}
 
 	return nil

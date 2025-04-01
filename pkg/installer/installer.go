@@ -492,7 +492,7 @@ func installSensorWithRetry(c string, env []string, args []string) ([]byte, []by
 	for i := 0; i < maxRetries; i++ {
 		lock, err := osutils.PackageManagerLock()
 		if err != nil {
-			return nil, nil, fmt.Errorf("Error checking package manager lock: %v", err)
+			return nil, nil, fmt.Errorf("error checking package manager lock: %v", err)
 		}
 
 		if !lock {
@@ -508,7 +508,7 @@ func installSensorWithRetry(c string, env []string, args []string) ([]byte, []by
 		time.Sleep(retryInterval)
 	}
 
-	return []byte("nil"), []byte("Could not install the sensor"), fmt.Errorf("Exceeded maximum retries: %d", maxRetries)
+	return []byte("nil"), []byte("Could not install the sensor"), fmt.Errorf("exceeded maximum retries: %d", maxRetries)
 }
 
 // rpmGpgKeyRetryImport attempts to import the GPG key every 5 seconds for 10 minutes.
@@ -519,7 +519,7 @@ func rpmGpgKeyRetryImport(gpgKey string) error {
 	for i := 0; i < maxRetries; i++ {
 		lock, err := osutils.PackageManagerLock()
 		if err != nil {
-			return fmt.Errorf("Error checking package manager lock: %v", err)
+			return fmt.Errorf("error checking package manager lock: %v", err)
 		}
 
 		if !lock {
@@ -535,7 +535,7 @@ func rpmGpgKeyRetryImport(gpgKey string) error {
 		time.Sleep(retryInterval)
 	}
 
-	return fmt.Errorf("Could not install the GPG Key. Exceeded maximum retries: %d", maxRetries)
+	return fmt.Errorf("could not install the GPG Key. Exceeded maximum retries: %d", maxRetries)
 }
 
 // configureSensorImage configures the Falcon sensor on the image.
@@ -550,7 +550,7 @@ func (fi FalconInstaller) configureSensorImage() error {
 
 		for i := 0; i < maxRetries; i++ {
 			if val, err = falconctl.Get(aid); err != nil {
-				return fmt.Errorf("Error retrieving Falcon sensor settings: %v", err)
+				return fmt.Errorf("error retrieving Falcon sensor settings: %v", err)
 			}
 
 			if strings.Contains(val, "aid is not set.") {
@@ -561,7 +561,7 @@ func (fi FalconInstaller) configureSensorImage() error {
 			}
 
 			if i == maxRetries-1 {
-				return fmt.Errorf("Sensor has not returned an AID")
+				return fmt.Errorf("sensor has not returned an AID")
 			}
 		}
 
@@ -569,7 +569,7 @@ func (fi FalconInstaller) configureSensorImage() error {
 		slog.Debug("Removing the aid from the sensor configuration")
 		delAid := []string{"-d", "-f", "--aid"}
 		if err := falconctl.Set(delAid); err != nil {
-			return fmt.Errorf("Error configuring Falcon sensor: %v", err)
+			return fmt.Errorf("error configuring Falcon sensor: %v", err)
 		}
 
 		// re-add the provisioning token if it was used
@@ -577,7 +577,7 @@ func (fi FalconInstaller) configureSensorImage() error {
 			slog.Debug("Re-adding provisioning token")
 			token := []string{"-s", "-f", fmt.Sprintf("--provisioning-token=%s", fi.SensorConfig.ProvisioningToken)}
 			if err := falconctl.Set(token); err != nil {
-				return fmt.Errorf("Error configuring Falcon sensor: %v", err)
+				return fmt.Errorf("error configuring Falcon sensor: %v", err)
 			}
 		}
 	case "macos":
@@ -585,7 +585,7 @@ func (fi FalconInstaller) configureSensorImage() error {
 
 		slog.Debug("Unloading Falcon sensor")
 		if err := falconctl.Set(fi.buildMacOSArgs("unload")); err != nil {
-			return fmt.Errorf("Error unloading Falcon sensor: %v", err)
+			return fmt.Errorf("error unloading Falcon sensor: %v", err)
 		}
 
 		slog.Debug("Removing registry.base", "Path", registryBase)
