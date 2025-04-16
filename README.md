@@ -39,10 +39,14 @@ Falcon API Flags:
 Falcon Sensor Flags:
       --cid string                  Falcon Customer ID. Optional when OAuth2 credentials are provided
       --disable-proxy               Disable the sensor proxy settings
+      --maintenance-token string    Maintenance token for uninstalling the sensor or configuring sensor settings
       --provisioning-token string   The provisioning token to use for installing the sensor. If not provided, the API will attempt to retrieve a token
       --proxy-host string           The proxy host for the sensor to use when communicating with CrowdStrike
       --proxy-port string           The proxy port for the sensor to use when communicating with CrowdStrike
       --tags string                 A comma separated list of tags for sensor grouping
+
+Falcon Uninstall Flags:
+      --uninstall   Uninstall the Falcon sensor
 ```
 
 ### Linux Specific Arguments
@@ -51,6 +55,13 @@ Falcon Sensor Flags:
 Linux Installation Flags:
       --configure-image   Use when installing the sensor in an image
       --gpg-key string    Falcon GPG key to import
+```
+
+### MacOS Specific Arguments
+
+```shell
+MacOS Installation Flags:
+      --configure-image   Use when installing the sensor in an image
 ```
 
 ### Windows Specific Arguments
@@ -75,7 +86,7 @@ Windows Installation Flags:
 
 You can build the binary for either Linux or Windows operating systems from source from within the root of the project directory.
 
-#### Linux
+#### Linux and MacOS
 ```bash
 go build -o falcon-installer cmd/main.go
 ```
