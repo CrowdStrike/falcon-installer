@@ -25,6 +25,7 @@ builds:
     goos:
       - linux
       - windows
+      - darwin
     goarch:
       - amd64
       - arm64
@@ -34,6 +35,8 @@ builds:
         goarch: 386
       - goos: windows
         goarch: s390x
+      - goos: darwin
+        goarch: s390x
 
 archives:
   - id: archives
@@ -42,7 +45,8 @@ archives:
     name_template: >-
       {{ .ProjectName }}-
       {{- .Version }}-
-      {{- .Os }}-
+      {{- if eq .Os "darwin" }}macos-
+      {{- else }}{{- .Os }}-{{ end }}
       {{- if eq .Arch "amd64" }}x86_64
       {{- else }}{{ .Arch }}{{ end }}
       {{- if .Arm }}v{{ .Arm }}{{ end }}
