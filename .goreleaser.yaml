@@ -40,7 +40,8 @@ builds:
 
 archives:
   - id: archives
-    format: tar.gz
+    formats:
+      - tar.gz
     # this name template makes the OS and Arch compatible with the results of `uname`.
     name_template: >-
       {{ .ProjectName }}-
@@ -53,15 +54,17 @@ archives:
     # use zip for windows archives
     format_overrides:
       - goos: windows
-        format: zip
+        formats: zip
 
   - id: binary
-    format: binary
+    formats:
+      - binary
     # this name template makes the OS and Arch compatible with the results of `uname`.
     name_template: >-
       {{ .ProjectName }}-
       {{- .Version }}-
-      {{- .Os }}-
+      {{- if eq .Os "darwin" }}macos-
+      {{- else }}{{- .Os }}-{{ end }}
       {{- if eq .Arch "amd64" }}x86_64
       {{- else }}{{ .Arch }}{{ end }}
       {{- if .Arm }}v{{ .Arm }}{{ end }}
