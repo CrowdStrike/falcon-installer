@@ -169,9 +169,9 @@ func GetSensorUpdatePolicies(client *client.CrowdStrikeAPISpecification, osType 
 
 	switch osType {
 	case "macos":
-		csPlatformName = "macos"
+		csPlatformName = "Mac"
 	case "windows":
-		csPlatformName = "windows"
+		csPlatformName = "Windows"
 	default:
 		csPlatformName = "Linux"
 	}
@@ -181,7 +181,7 @@ func GetSensorUpdatePolicies(client *client.CrowdStrikeAPISpecification, osType 
 		sensorUpdatePolicyName = "platform_default"
 	}
 
-	f := fmt.Sprintf("platform_name:~\"%s\"+name.raw:\"%s\"", csPlatformName, sensorUpdatePolicyName)
+	f := fmt.Sprintf("platform_name:\"%s\"+name.raw:\"%s\"", csPlatformName, sensorUpdatePolicyName)
 	slog.Debug("Sensor Update Policy Query", slog.String("Filter", f))
 	filter = &f
 
