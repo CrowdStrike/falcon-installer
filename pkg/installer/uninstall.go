@@ -86,18 +86,18 @@ func (fc FalconInstaller) uninstallSensor(maintenanceToken string) error {
 
 	switch fc.OSType {
 	case "linux":
-		return fc.uninstallLinuxSensor()
+		return fc.uninstallLinuxSensor(maintenanceToken)
 	case "windows":
 		return fc.uninstallWindowsSensor(maintenanceToken)
 	case "macos", "darwin":
 		return fc.uninstallMacOSSensor(maintenanceToken)
 	default:
-		return fmt.Errorf("unsupported OS for uninstallation: %s", fc.OSType)
+		return fmt.Errorf("unsupported OS for sensor uninstallation: %s", fc.OSType)
 	}
 }
 
 // uninstallLinuxSensor uninstalls the Falcon sensor on Linux systems.
-func (fc FalconInstaller) uninstallLinuxSensor() error {
+func (fc FalconInstaller) uninstallLinuxSensor(maintenanceToken string) error {
 	const sensorPackage = "falcon-sensor"
 
 	// Define package managers in order of preference
@@ -111,6 +111,14 @@ func (fc FalconInstaller) uninstallLinuxSensor() error {
 		{"/usr/bin/zypper", []string{"remove", "--quiet", "-y", sensorPackage}, nil},
 		{"/usr/bin/apt-get", []string{"purge", "-y", sensorPackage}, []string{"DEBIAN_FRONTEND=noninteractive"}},
 		{"/usr/bin/dpkg", []string{"remove", "--qq", "-y", sensorPackage}, []string{"DEBIAN_FRONTEND=noninteractive"}},
+	}
+
+	// run falconctl with maintenancetoken
+	if maintenanceToken != "" {
+		err := falconctl.Set([]string{"-s", fmt.Sprintf("--maintenance-token=%s", maintenanceToken)})
+		if err != nil {
+			return fmt.Errorf("failed to set maintenance token: %w", err)
+		}
 	}
 
 	// Find the first available package manager
