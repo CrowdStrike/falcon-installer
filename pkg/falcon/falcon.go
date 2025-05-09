@@ -252,10 +252,13 @@ func GetSensorUpdatePolicies(client *client.CrowdStrikeAPISpecification, osType 
 }
 
 // GetSensors queries the CrowdStrike API for Falcon sensors that match the provided OS name, version, and architecture.
-func GetSensors(client *client.CrowdStrikeAPISpecification, osName string, osVersion string, osType string, arch string, sensorUpdatePolicyName string) []*models.DomainSensorInstallerV2 {
+func GetSensors(client *client.CrowdStrikeAPISpecification, osName string, osVersion string, osType string, arch string, sensorUpdatePolicyName string, sensorVersion string) []*models.DomainSensorInstallerV2 {
 	var filter *string
 
-	sensorVersion := GetSensorUpdatePolicies(client, osType, arch, sensorUpdatePolicyName)
+	if sensorVersion == "latest" {
+		sensorVersion = GetSensorUpdatePolicies(client, osType, arch, sensorUpdatePolicyName)
+	}
+
 	if osName != "" {
 		osVersionFilter := fmt.Sprintf("*%s*", osVersion)
 		if slices.Contains(enterpriseLinux, strings.ToLower(osName)) {
@@ -304,7 +307,7 @@ func GetSensors(client *client.CrowdStrikeAPISpecification, osName string, osVer
 
 // QuerySuitableSensor queries the CrowdStrike API for a suitable Falcon sensor that matches the provided OS name, version, and architecture.
 func QuerySuitableSensor(client *client.CrowdStrikeAPISpecification, osName string, osVersion string, osType string, arch string, sensorUpdatePolicyName string, sensorVersion string) *models.DomainSensorInstallerV2 {
-	for _, sensor := range GetSensors(client, osName, osVersion, osType, arch, sensorUpdatePolicyName) {
+	for _, sensor := range GetSensors(client, osName, osVersion, osType, arch, sensorUpdatePolicyName, sensorVersion) {
 		if strings.Contains(*sensor.OsVersion, osVersion) {
 			if *sensor.Version == sensorVersion || sensorVersion == "latest" {
 				slog.Debug("Found suitable Falcon sensor", "Version", *sensor.Version)

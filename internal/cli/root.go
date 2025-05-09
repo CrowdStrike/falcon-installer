@@ -114,6 +114,7 @@ func rootCmd() *cobra.Command {
 	apiFlag.StringVar(&fi.MemberCID, "member-cid", "", "Member CID for MSSP (for cases when OAuth2 authenticates multiple CIDs)")
 	apiFlag.StringVar(&fi.Cloud, "cloud", "autodiscover", "Falcon cloud abbreviation (e.g. us-1, us-2, eu-1, us-gov-1)")
 	apiFlag.StringVar(&fi.SensorUpdatePolicyName, "sensor-update-policy", "platform_default", "The sensor update policy name to use for sensor installation")
+	apiFlag.StringVar(&fi.SensorVersion, "sensor-version", "latest", "The sensor version to update or install (overrides sensor-update-policy)")
 	apiFlag.StringVar(&fi.UserAgent, "user-agent", "", "User agent string to append to use for API requests")
 	rootCmd.Flags().AddFlagSet(apiFlag)
 	err := viper.BindPFlags(apiFlag)
@@ -122,6 +123,22 @@ func rootCmd() *cobra.Command {
 	}
 	groups["Falcon API Flags"] = apiFlag
 
+	// Falcon update flags
+	updateFlag := pflag.NewFlagSet("Update", pflag.ExitOnError)
+	updateFlag.Bool("update", false, "Update the Falcon sensor for when sensor update policies are not in use")
+	updateFlag.Bool("upgrade", false, "Upgrade the Falcon sensor for when sensor update policies are not in use")
+	err = updateFlag.MarkHidden("upgrade")
+	if err != nil {
+		log.Fatalf("Error marking upgrade flag as hidden: %v", err)
+	}
+	rootCmd.Flags().AddFlagSet(updateFlag)
+	err = viper.BindPFlags(updateFlag)
+	if err != nil {
+		log.Fatalf("Error binding falcon uninstall flags: %v", err)
+	}
+	groups["Falcon Update Flags"] = updateFlag
+
+	// Falcon uninstall flags
 	uninstallFlag := pflag.NewFlagSet("Uninstall", pflag.ExitOnError)
 	uninstallFlag.Bool("uninstall", false, "Uninstall the Falcon sensor")
 	rootCmd.Flags().AddFlagSet(uninstallFlag)
@@ -297,7 +314,7 @@ func preRunValidation(cmd *cobra.Command) error {
 		return fmt.Errorf("invalid CID format: %v", err)
 	}
 
-	if err := inputValidation(viper.GetString("member_cid"), "^[0-9a-fA-F]{32}-[0-9a-fA-F]{2}$"); err != nil {
+	if err := inputValidation(viper.GetString("member-cid"), "^[0-9a-fA-F]{32}-[0-9a-fA-F]{2}$"); err != nil {
 		return fmt.Errorf("invalid member CID format: %v", err)
 	}
 
@@ -307,6 +324,13 @@ func preRunValidation(cmd *cobra.Command) error {
 
 	if err := inputValidation(viper.GetString("tags"), "^[a-zA-Z0-9,_/-]+$"); err != nil {
 		return fmt.Errorf("invalid Falcon Sensor tag format: %v", err)
+	}
+
+	sVer := viper.GetString("sensor-version")
+	if sVer != "latest" && sVer != "" {
+		if err := inputValidation(sVer, "^[0-9]+.[0-9]+.[0-9]+$"); err != nil {
+			return fmt.Errorf("invalid Falcon Sensor version format: %v", err)
+		}
 	}
 
 	if fc.ProxyDisable && (fc.ProxyHost != "" || fc.ProxyPort != "") {
@@ -343,13 +367,15 @@ func Run(cmd *cobra.Command, args []string) {
 	fi.OsVersion = osVersion
 	fi.SensorConfig = fc
 
-	if !cmd.Flags().Changed("uninstall") {
+	switch {
+	case cmd.Flags().Changed("uninstall"):
+		installer.Uninstall(fi)
+	case cmd.Flags().Changed("update"), cmd.Flags().Changed("upgrade"):
+		installer.Update(fi)
+	default:
 		slog.Debug("Falcon sensor CLI options", "CID", fc.CID, "ProvisioningToken", fc.ProvisioningToken, "Tags", fc.Tags, "DisableProxy", fc.ProxyDisable, "ProxyHost", fc.ProxyHost, "ProxyPort", fc.ProxyPort)
 		slog.Debug("Falcon installer options", "Cloud", fi.Cloud, "MemberCID", fi.MemberCID, "SensorUpdatePolicyName", fi.SensorUpdatePolicyName, "GpgKeyFile", fi.GpgKeyFile, "TmpDir", fi.TmpDir, "OsName", fi.OsName, "OsVersion", fi.OsVersion, "OS", fi.OSType, "Arch", fi.Arch)
-
 		installer.Run(fi)
-	} else {
-		installer.Uninstall(fi)
 	}
 }
 

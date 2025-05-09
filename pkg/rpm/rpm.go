@@ -25,6 +25,7 @@ package rpm
 import (
 	"fmt"
 	"os/exec"
+	"path/filepath"
 	"strings"
 
 	"github.com/crowdstrike/falcon-installer/pkg/utils"
@@ -42,6 +43,18 @@ func Query(name string) (bool, error) {
 	}
 
 	return true, nil
+}
+
+// GetVersion returns the version of an installed package.
+func GetVersion(name string) ([]string, error) {
+	stdout, _, err := utils.RunCmd(rpmCmd, []string{"-q", "--qf", "[%{VERSION} %{RELEASE}]", name})
+	if err != nil {
+		return []string{}, fmt.Errorf("error getting package version: %v", err)
+
+	}
+
+	rpmVer := strings.TrimSuffix(string(stdout), filepath.Ext(string(stdout)))
+	return strings.Split(rpmVer, " "), nil
 }
 
 // IsRpmInstalled checks if the rpm command is installed.
