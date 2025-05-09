@@ -50,13 +50,16 @@ func GetCID(ctx context.Context, client *client.CrowdStrikeAPISpecification) (st
 	if err != nil {
 		return "", fmt.Errorf("could not get Falcon CID from CrowdStrike Falcon API: %v", err)
 	}
+
 	payload := response.GetPayload()
 	if err = falcon.AssertNoError(payload.Errors); err != nil {
 		return "", fmt.Errorf("error reported when getting Falcon CID from CrowdStrike Falcon API: %v", err)
 	}
+
 	if len(payload.Resources) != 1 {
 		return "", fmt.Errorf("failed to get Falcon CID: Unexpected API response: %v", payload.Resources)
 	}
+
 	return payload.Resources[0], nil
 
 }
@@ -135,9 +138,9 @@ func GetProvisioningToken(client *client.CrowdStrikeAPISpecification) string {
 			log.Fatal(falcon.ErrorExplain(err))
 		}
 
-		bytes, err := errPayload.MarshalBinary()
-		if err != nil {
-			log.Fatal(err)
+		bytes, mErr := errPayload.MarshalBinary()
+		if mErr != nil {
+			log.Fatal(mErr)
 		}
 
 		if strings.Contains(string(bytes), "\"code\":403,\"message\":\"access denied, authorization failed\"") {
@@ -197,9 +200,9 @@ func GetSensorUpdatePolicies(client *client.CrowdStrikeAPISpecification, osType 
 			log.Fatal(falcon.ErrorExplain(err))
 		}
 
-		bytes, err := errPayload.MarshalBinary()
-		if err != nil {
-			log.Fatal(err)
+		bytes, mErr := errPayload.MarshalBinary()
+		if mErr != nil {
+			log.Fatal(mErr)
 		}
 
 		if strings.Contains(string(bytes), "\"code\":403,\"message\":\"access denied, authorization failed\"") {
@@ -280,6 +283,7 @@ func GetSensors(client *client.CrowdStrikeAPISpecification, osName string, osVer
 	if err != nil {
 		log.Fatal(falcon.ErrorExplain(err))
 	}
+
 	payload := res.GetPayload()
 	if err = falcon.AssertNoError(payload.Errors); err != nil {
 		log.Fatal(err)
