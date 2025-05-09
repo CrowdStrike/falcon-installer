@@ -23,6 +23,7 @@
 package dpkg
 
 import (
+	"strings"
 	"testing"
 )
 
@@ -85,5 +86,53 @@ func TestQuery(t *testing.T) {
 	if got {
 		t.Errorf("Expected package not to be installed: Got: %v, Error: %v", got, err)
 	}
+}
 
+func TestGetVersion(t *testing.T) {
+	dpkgCmd = "/usr/bin/asdfasdf"
+	got, err := GetVersion("dpkg")
+	if err == nil {
+		t.Errorf("Expected error but got none")
+	}
+
+	if got != "" {
+		t.Errorf("Expected empty version but got: %v", got)
+	}
+
+	dpkgCmd = "/usr/bin/dpkg"
+
+	// Skip dpkg query if dpkg is not installed
+	skipDpkgTests(t)
+
+	got, err = GetVersion("dpkg")
+	if err != nil {
+		t.Error(err)
+	}
+
+	if got == "" {
+		t.Errorf("Expected version but got empty string")
+	}
+
+	got, err = GetVersion("nonexistent-package")
+	if err == nil {
+		t.Errorf("Expected error but got none")
+	}
+
+	if got != "" {
+		t.Errorf("Expected empty version but got: %v", got)
+	}
+
+	// Test error message for non-installed package
+	got, err = GetVersion("nonexistent-package")
+	if err == nil {
+		t.Errorf("Expected error but got none")
+	}
+
+	if !strings.Contains(err.Error(), "package nonexistent-package is not installed") {
+		t.Errorf("Expected error message to contain 'package nonexistent-package is not installed', got: %v", err.Error())
+	}
+
+	if got != "" {
+		t.Errorf("Expected empty version but got: %v", got)
+	}
 }

@@ -98,3 +98,29 @@ func TestGpgKeyImport(t *testing.T) {
 		t.Errorf("Expected error: %v", err)
 	}
 }
+
+func TestGetVersion(t *testing.T) {
+	rpmCmd = "/usr/bin/asdfasdf"
+	_, err := GetVersion("rpm")
+	if err == nil {
+		t.Errorf("Expected error: %v", err)
+	}
+
+	rpmCmd = "/usr/bin/rpm"
+
+	// Skip rpm version test if rpm is not installed
+	skipRpmTests(t)
+
+	version, err := GetVersion("rpm")
+	if err != nil {
+		t.Error(err)
+	}
+	if len(version) == 0 {
+		t.Errorf("Expected version to be returned: Got: %v, Error: %v", version, err)
+	}
+
+	_, err = GetVersion("unknown")
+	if err == nil {
+		t.Errorf("Expected error: %v", err)
+	}
+}

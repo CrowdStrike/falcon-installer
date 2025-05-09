@@ -97,6 +97,10 @@ type FalconInstaller struct {
 	Cloud string
 	// SensorUpdatePolicyName is the sensor update policy name to use for sensor installation.
 	SensorUpdatePolicyName string
+	// SensorVersion is the specific version of the sensor to install. If empty, the latest version will be used.
+	// This will install the specific version of the sensor instead of using the sensor update policy.
+	// Note: Only use this if you do not use sensor update policies.
+	SensorVersion string
 	// TmpDir is the temporary directory to use for downloading the sensor.
 	TmpDir string
 	// Arch is the architecture to install the sensor on.
@@ -184,7 +188,7 @@ func Run(fc FalconInstaller) {
 		}
 
 		// Query the CrowdStrike API for a suitable Falcon sensor
-		sensor := falcon.QuerySuitableSensor(client, fc.OsName, fc.OsVersion, fc.OSType, fc.Arch, fc.SensorUpdatePolicyName, "latest")
+		sensor := falcon.QuerySuitableSensor(client, fc.OsName, fc.OsVersion, fc.OSType, fc.Arch, fc.SensorUpdatePolicyName, fc.SensorVersion)
 		if sensor == nil {
 			log.Fatalf("Could not find Falcon sensor for '%s' '%s'", fc.OsName, fc.OsVersion)
 		}
@@ -429,7 +433,7 @@ func (fi FalconInstaller) installLinuxSensor(path string) error {
 		{"/usr/bin/yum", []string{"install", "-q", "-y", path}, nil},
 		{"/usr/bin/zypper", []string{"install", "--quiet", "-y", path}, nil},
 		{"/usr/bin/apt-get", []string{"install", "-y", path}, []string{"DEBIAN_FRONTEND=noninteractive"}},
-		{"/usr/bin/dpkg", []string{"install", "--qq", "-y", path}, []string{"DEBIAN_FRONTEND=noninteractive"}},
+		{"/usr/bin/dpkg", []string{"--install", path}, []string{"DEBIAN_FRONTEND=noninteractive"}},
 	}
 
 	// Find the first available package manager

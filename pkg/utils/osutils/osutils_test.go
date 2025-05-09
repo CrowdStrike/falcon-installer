@@ -27,6 +27,8 @@ package osutils
 
 import (
 	"runtime"
+	"strconv"
+	"strings"
 	"testing"
 )
 
@@ -171,4 +173,44 @@ func TestSCQueryExists(t *testing.T) {
 	if got {
 		t.Errorf("Expected Falcon Sensor not to be installed: Got: %v, Error: %v", got, err)
 	}
+}
+
+func TestInstalledFalconVersion(t *testing.T) {
+	got, err := InstalledFalconVersion(testArch())
+	if err != nil {
+		// Skip the test if Falcon is not installed
+		installed, ierr := FalconInstalled(testArch())
+		if ierr != nil {
+			t.Error(ierr)
+		}
+
+		if installed {
+			t.Error(err)
+		}
+	}
+
+	// Since we're testing, we don't expect a specific version
+	// We just want to make sure the function returns something reasonable
+	if got == "" {
+		t.Skip("Skipping test as Falcon Sensor is not installed")
+	}
+
+	// Check that the version string follows a typical version format
+	if !strings.Contains(got, ".") {
+		t.Errorf("Expected version string to contain periods, got: %s", got)
+	}
+
+	// Verify version string has at least two components (major.minor)
+	parts := strings.Split(got, ".")
+	if len(parts) < 2 {
+		t.Errorf("Expected version string to have at least major and minor components, got: %s", got)
+	}
+
+	// Check that each component is a number
+	for _, part := range parts {
+		if _, err := strconv.Atoi(part); err != nil {
+			t.Errorf("Expected version component to be a number, got: %s", part)
+		}
+	}
+
 }
