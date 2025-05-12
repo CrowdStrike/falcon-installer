@@ -52,3 +52,25 @@ func Query(name string) (bool, error) {
 
 	return strings.Contains(string(stdout), name), nil
 }
+
+// GetVersion returns the version of a package using `dpkg -s <package>`.
+func GetVersion(name string) (string, error) {
+	stdout, stderr, err := utils.RunCmd(dpkgCmd, []string{"-s", name})
+	if err != nil {
+		if strings.Contains(string(stderr), "no packages found") || strings.Contains(string(stderr), "not installed") {
+			return "", fmt.Errorf("package %s is not installed", name)
+
+		}
+		return "", fmt.Errorf("error getting package version: %w", err)
+	}
+
+	// Parse the output to extract the version
+	lines := strings.Split(string(stdout), "\n")
+	for _, line := range lines {
+		if strings.HasPrefix(line, "Version:") {
+			return strings.TrimSpace(strings.TrimPrefix(line, "Version:")), nil
+		}
+	}
+
+	return "", fmt.Errorf("version not found for package %s", name)
+}

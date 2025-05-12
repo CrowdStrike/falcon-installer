@@ -161,3 +161,15 @@ func TestSCQuery(t *testing.T) {
 		t.Errorf("Expected service not to be running: Got: %v, Error: %v", got, err)
 	}
 }
+
+func TestInstalledFalconVersion(t *testing.T) {
+	got, err := InstalledFalconVersion("windows")
+	if err != nil {
+		t.Skip("Skipping test as Falcon Sensor is not installed")
+
+	}
+
+	if got == "" {
+		t.Errorf("Expected version string, got empty string")
+	}
+}

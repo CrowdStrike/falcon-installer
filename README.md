@@ -12,7 +12,12 @@ Ensure the following API scopes are enabled:
 > - (optional) **Installation Tokens** [read]
 >   > This scope allows the installer to retrieve a provisioning token from the API, but only if installation tokens are required in your environment.
 > - (optional) **Sensor update policies** [read]
->   > Use this scope when configuring the `FALCON_SENSOR_UPDATE_POLICY_NAME` environment variable.
+>   > Use this scope when using the `--sensor-update-policy` flag or configuring the `FALCON_SENSOR_UPDATE_POLICY` environment variable.
+> - (Optional) Sensor update policies [write]
+>   > Required if you want to automatically retrieve a maintenance token from the API. Not needed when using the
+>   > `--maintenance-token` flag or configuring the `FALCON_MAINTENANCE_TOKEN` environment variable. Maintenance
+>   > tokens are required to uninstall sensors that have uninstall protection enabled.
+
 
 ## Usage
 
@@ -29,11 +34,13 @@ Flags:
   -v, --version               Print version information
 
 Falcon API Flags:
+      --access-token string           Access token for accessing CrowdStrike Falcon Platform
       --client-id string              Client ID for accessing CrowdStrike Falcon Platform
       --client-secret string          Client Secret for accessing CrowdStrike Falcon Platform
       --cloud string                  Falcon cloud abbreviation (e.g. us-1, us-2, eu-1, us-gov-1) (default "autodiscover")
       --member-cid string             Member CID for MSSP (for cases when OAuth2 authenticates multiple CIDs)
       --sensor-update-policy string   The sensor update policy name to use for sensor installation (default "platform_default")
+      --sensor-version string         The sensor version to update or install (overrides sensor-update-policy) (default "latest")
       --user-agent string             User agent string to append to use for API requests
 
 Falcon Sensor Flags:
@@ -47,6 +54,9 @@ Falcon Sensor Flags:
 
 Falcon Uninstall Flags:
       --uninstall   Uninstall the Falcon sensor
+
+Falcon Update Flags:
+      --update   Update the Falcon sensor for when sensor update policies are not in use
 ```
 
 ### Linux Specific Arguments
@@ -97,6 +107,35 @@ go build -o falcon-installer.exe cmd/main.go
 ```
 
 Once the binary has been built, you can then manually copy to a location in the local $PATH if desired.
+
+## Usage
+
+The Falcon Installer provides several command-line options to customize the installation process. Below are some common usage examples:
+
+#### Basic Installation
+```shell
+falcon-installer --client-id YOUR_CLIENT_ID --client-secret YOUR_CLIENT_SECRET
+```
+
+#### Installation with Specific Options
+```shell
+falcon-installer --client-id YOUR_CLIENT_ID --client-secret YOUR_CLIENT_SECRET --cloud us-1 --sensor-update-policy enterprise --tags  
+```
+
+#### Installation with Parent/Child CIDs
+```shell
+falcon-installer --client-id PARENT_CLIENT_ID --client-secret PARENT_CLIENT_SECRET --member-cid MEMBER_CID
+```
+
+#### Uninstallation
+```shell
+falcon-installer --client-id YOUR_CLIENT_ID --client-secret YOUR_CLIENT_SECRET --uninstall
+```
+
+#### Update
+```shell
+falcon-installer --client-id YOUR_CLIENT_ID --client-secret YOUR_CLIENT_SECRET --update --sensor-version 1.42.1234
+```
 
 ## Contributing
 
