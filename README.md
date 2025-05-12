@@ -119,7 +119,7 @@ falcon-installer --client-id YOUR_CLIENT_ID --client-secret YOUR_CLIENT_SECRET
 
 #### Installation with Specific Options
 ```shell
-falcon-installer --client-id YOUR_CLIENT_ID --client-secret YOUR_CLIENT_SECRET --cloud us-1 --sensor-update-policy enterprise --tags  
+falcon-installer --client-id YOUR_CLIENT_ID --client-secret YOUR_CLIENT_SECRET --cloud us-1 --sensor-update-policy enterprise --tags "tag1,tag2,tag3"
 ```
 
 #### Installation with Parent/Child CIDs

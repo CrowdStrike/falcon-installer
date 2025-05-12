@@ -34,6 +34,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/crowdstrike/falcon-installer/internal/config"
 	"github.com/crowdstrike/falcon-installer/internal/version"
 	"github.com/crowdstrike/falcon-installer/pkg/installer"
 	"github.com/crowdstrike/falcon-installer/pkg/utils/osutils"
@@ -48,10 +49,13 @@ var (
 	targetOS   = "linux"
 	arch       = "x86_64"
 
-	defaultTmpDir = fmt.Sprint(os.TempDir(), string(os.PathSeparator), "falcon")
-	logFile       = fmt.Sprint(defaultTmpDir, string(os.PathSeparator), "falcon-installer.log")
-	fi            = installer.FalconInstaller{}
-	fc            = installer.FalconSensorCLI{}
+	defaultTmpDir                      = fmt.Sprint(os.TempDir(), string(os.PathSeparator), "falcon")
+	defaultProvisioningWaitTime uint64 = 1200000
+	defaultSensorUpdatePolicy          = "platform_default"
+	defaultSensorVersion               = "latest"
+	defaultCloudRegion                 = "autodiscover"
+	logFile                            = fmt.Sprint(defaultTmpDir, string(os.PathSeparator), "falcon-installer.log")
+	cfg                         *config.Config
 )
 
 func init() {
@@ -78,7 +82,6 @@ func init() {
 	default:
 		log.Fatalf("Unsupported OS architecture: %s\n", arch)
 	}
-
 }
 
 // rootCmd returns the root command for the CLI.
@@ -89,7 +92,7 @@ func rootCmd() *cobra.Command {
 		Long:             "A lightweight, multi-platform CrowdStrike Falcon sensor installer written in Golang with consistent configuration flags across multiple operating systems.",
 		Version:          cliVersion,
 		PersistentPreRun: preRunConfig,
-		PreRun: func(cmd *cobra.Command, args []string) {
+		PreRun: func(cmd *cobra.Command, _ []string) {
 			if err := preRunValidation(cmd); err != nil {
 				log.Fatalf("%v", err)
 			}
@@ -97,7 +100,7 @@ func rootCmd() *cobra.Command {
 		Run: Run,
 	}
 
-	rootCmd.PersistentFlags().StringVar(&fi.TmpDir, "tmpdir", defaultTmpDir, "Temporary directory for downloading files")
+	rootCmd.PersistentFlags().String("tmpdir", defaultTmpDir, "Temporary directory for downloading files")
 	rootCmd.PersistentFlags().Bool("quiet", false, "Suppress all log output")
 	rootCmd.PersistentFlags().Bool("enable-file-logging", false, "Output logs to file")
 	rootCmd.PersistentFlags().BoolP("help", "h", false, "Print usage information")
@@ -108,14 +111,14 @@ func rootCmd() *cobra.Command {
 
 	// Falcon API flags
 	apiFlag := pflag.NewFlagSet("FalconAPI", pflag.ExitOnError)
-	apiFlag.StringVar(&fi.ClientID, "client-id", "", "Client ID for accessing CrowdStrike Falcon Platform")
-	apiFlag.StringVar(&fi.ClientSecret, "client-secret", "", "Client Secret for accessing CrowdStrike Falcon Platform")
-	apiFlag.StringVar(&fi.AccessToken, "access-token", "", "Access token for accessing CrowdStrike Falcon Platform")
-	apiFlag.StringVar(&fi.MemberCID, "member-cid", "", "Member CID for MSSP (for cases when OAuth2 authenticates multiple CIDs)")
-	apiFlag.StringVar(&fi.Cloud, "cloud", "autodiscover", "Falcon cloud abbreviation (e.g. us-1, us-2, eu-1, us-gov-1)")
-	apiFlag.StringVar(&fi.SensorUpdatePolicyName, "sensor-update-policy", "platform_default", "The sensor update policy name to use for sensor installation")
-	apiFlag.StringVar(&fi.SensorVersion, "sensor-version", "latest", "The sensor version to update or install (overrides sensor-update-policy)")
-	apiFlag.StringVar(&fi.UserAgent, "user-agent", "", "User agent string to append to use for API requests")
+	apiFlag.String("client-id", "", "Client ID for accessing CrowdStrike Falcon Platform")
+	apiFlag.String("client-secret", "", "Client Secret for accessing CrowdStrike Falcon Platform")
+	apiFlag.String("access-token", "", "Access token for accessing CrowdStrike Falcon Platform")
+	apiFlag.String("member-cid", "", "Member CID for MSSP (for cases when OAuth2 authenticates multiple CIDs)")
+	apiFlag.String("cloud", defaultCloudRegion, "Falcon cloud abbreviation (e.g. us-1, us-2, eu-1, us-gov-1)")
+	apiFlag.String("sensor-update-policy", defaultSensorUpdatePolicy, "The sensor update policy name to use for sensor installation")
+	apiFlag.String("sensor-version", defaultSensorVersion, "The sensor version to update or install (overrides sensor-update-policy)")
+	apiFlag.String("user-agent", "", "User agent string to append to use for API requests")
 	rootCmd.Flags().AddFlagSet(apiFlag)
 	err := viper.BindPFlags(apiFlag)
 	if err != nil {
@@ -150,16 +153,16 @@ func rootCmd() *cobra.Command {
 
 	// Falcon sensor flags
 	falconFlag := pflag.NewFlagSet("Falcon", pflag.ExitOnError)
-	falconFlag.StringVar(&fc.CID, "cid", "", "Falcon Customer ID. Optional when OAuth2 credentials are provided")
-	falconFlag.StringVar(&fc.ProvisioningToken, "provisioning-token", "",
+	falconFlag.String("cid", "", "Falcon Customer ID. Optional when OAuth2 credentials are provided")
+	falconFlag.String("provisioning-token", "",
 		"The provisioning token to use for installing the sensor. If not provided, the API will attempt to retrieve a token")
-	falconFlag.StringVar(&fc.Tags, "tags", "", "A comma separated list of tags for sensor grouping")
-	falconFlag.StringVar(&fc.MaintenanceToken, "maintenance-token", "", "Maintenance token for uninstalling the sensor or configuring sensor settings")
+	falconFlag.String("tags", "", "A comma separated list of tags for sensor grouping")
+	falconFlag.String("maintenance-token", "", "Maintenance token for uninstalling the sensor or configuring sensor settings")
 
 	if targetOS != "macos" {
-		falconFlag.BoolVar(&fc.ProxyDisable, "disable-proxy", false, "Disable the sensor proxy settings")
-		falconFlag.StringVar(&fc.ProxyHost, "proxy-host", "", "The proxy host for the sensor to use when communicating with CrowdStrike")
-		falconFlag.StringVar(&fc.ProxyPort, "proxy-port", "", "The proxy port for the sensor to use when communicating with CrowdStrike")
+		falconFlag.Bool("disable-proxy", false, "Disable the sensor proxy settings")
+		falconFlag.String("proxy-host", "", "The proxy host for the sensor to use when communicating with CrowdStrike")
+		falconFlag.String("proxy-port", "", "The proxy port for the sensor to use when communicating with CrowdStrike")
 	}
 
 	rootCmd.Flags().AddFlagSet(falconFlag)
@@ -173,8 +176,8 @@ func rootCmd() *cobra.Command {
 	case "linux":
 		// Linux sensor flags
 		linuxFlag := pflag.NewFlagSet("Linux", pflag.ExitOnError)
-		linuxFlag.StringVar(&fi.GpgKeyFile, "gpg-key", "", "Falcon GPG key to import")
-		linuxFlag.BoolVar(&fi.ConfigureImage, "configure-image", false, "Use when installing the sensor in an image")
+		linuxFlag.String("gpg-key", "", "Falcon GPG key to import")
+		linuxFlag.Bool("configure-image", false, "Use when installing the sensor in an image")
 		rootCmd.Flags().AddFlagSet(linuxFlag)
 		err = viper.BindPFlags(linuxFlag)
 		if err != nil {
@@ -185,7 +188,7 @@ func rootCmd() *cobra.Command {
 	case "macos":
 		// MacOS sensor flags
 		macosFlag := pflag.NewFlagSet("MacOS", pflag.ExitOnError)
-		macosFlag.BoolVar(&fi.ConfigureImage, "configure-image", false, "Use when installing the sensor in an image")
+		macosFlag.Bool("configure-image", false, "Use when installing the sensor in an image")
 		rootCmd.Flags().AddFlagSet(macosFlag)
 		err = viper.BindPFlags(macosFlag)
 		if err != nil {
@@ -196,13 +199,13 @@ func rootCmd() *cobra.Command {
 	case "windows":
 		// Windows sensor flags
 		winFlag := pflag.NewFlagSet("Windows", pflag.ExitOnError)
-		winFlag.BoolVar(&fc.Restart, "restart", false, "Allow the system to restart after sensor installation if necessary")
-		winFlag.StringVar(&fc.PACURL, "pac-url", "", "Configure a proxy connection using the URL of a PAC file when communicating with CrowdStrike")
-		winFlag.BoolVar(&fc.DisableProvisioningWait, "disable-provisioning-wait", false, "Disabling allows the Windows installer more provisioning time")
-		winFlag.Uint64Var(&fc.ProvisioningWaitTime, "provisioning-wait-time", 1200000, "The number of milliseconds to wait for the sensor to provision")
-		winFlag.BoolVar(&fc.NoStart, "disable-start", false, "Prevent the sensor from starting after installation until a reboot occurs")
-		winFlag.BoolVar(&fc.VDI, "vdi", false, "Enable virtual desktop infrastructure mode")
-		winFlag.BoolVar(&fi.ConfigureImage, "configure-image", false, "Use when installing the sensor in an image")
+		winFlag.Bool("restart", false, "Allow the system to restart after sensor installation if necessary")
+		winFlag.String("pac-url", "", "Configure a proxy connection using the URL of a PAC file when communicating with CrowdStrike")
+		winFlag.Bool("disable-provisioning-wait", false, "Disabling allows the Windows installer more provisioning time")
+		winFlag.Uint64("provisioning-wait-time", defaultProvisioningWaitTime, "The number of milliseconds to wait for the sensor to provision")
+		winFlag.Bool("disable-start", false, "Prevent the sensor from starting after installation until a reboot occurs")
+		winFlag.Bool("vdi", false, "Enable virtual desktop infrastructure mode")
+		winFlag.Bool("configure-image", false, "Use when installing the sensor in an image")
 		rootCmd.Flags().AddFlagSet(winFlag)
 		err = viper.BindPFlags(winFlag)
 		if err != nil {
@@ -217,7 +220,7 @@ func rootCmd() *cobra.Command {
 }
 
 // preRunConfig sets up the environment before running the command.
-func preRunConfig(cmd *cobra.Command, args []string) {
+func preRunConfig(cmd *cobra.Command, _ []string) {
 	// Check if running with privileges to install Falcon sensor
 	privs, err := osutils.RunningWithPrivileges(targetOS)
 	if !privs || err != nil {
@@ -229,12 +232,24 @@ func preRunConfig(cmd *cobra.Command, args []string) {
 	viper.AutomaticEnv()
 	bindCobraFlags(cmd)
 
-	verbose := cmd.Flags().Changed("verbose")
-	quiet := cmd.Flags().Changed("quiet")
-	enableFileLogging := cmd.Flags().Changed("enable-file-logging")
+	cfg, err = config.Load()
+	if err != nil {
+		log.Fatalf("Error loading configuration: %v", err)
+	}
 
-	if cmd.Flags().Changed("tmpdir") {
-		logFile = fmt.Sprintf("%s%s%s", fi.TmpDir, string(os.PathSeparator), "falcon-installer.log")
+	verbose := viper.GetBool("verbose")
+	quiet := viper.GetBool("quiet")
+	enableFileLogging := viper.GetBool("enable_file_logging")
+
+	//create tmp directory if it does not exist
+	if _, err := os.Stat(cfg.TmpDir); os.IsNotExist(err) {
+		if err := os.MkdirAll(cfg.TmpDir, 0700); err != nil {
+			log.Fatalf("Error creating temporary directory: %v", err)
+		}
+	}
+
+	if cfg.TmpDir != defaultTmpDir {
+		logFile = fmt.Sprintf("%s%s%s", cfg.TmpDir, string(os.PathSeparator), "falcon-installer.log")
 	}
 
 	if quiet {
@@ -254,13 +269,6 @@ func preRunConfig(cmd *cobra.Command, args []string) {
 		slog.Debug("Starting falcon-installer", "Version", version.Version)
 		slog.Debug("Verbose output enabled")
 	}
-
-	//create tmp directory if it does not exist
-	if _, err := os.Stat(fi.TmpDir); os.IsNotExist(err) {
-		if err := os.MkdirAll(fi.TmpDir, 0700); err != nil {
-			log.Fatalf("Error creating temporary directory: %v", err)
-		}
-	}
 }
 
 // preRunValidation validates the input flags before running the command.
@@ -272,41 +280,41 @@ func preRunValidation(cmd *cobra.Command) error {
 	cmd.SilenceUsage = true
 
 	// Skip the validation if uninstall flag is set
-	if cmd.Flags().Changed("uninstall") || viper.GetBool("uninstall") {
+	if viper.GetBool("uninstall") || viper.GetBool("update") || viper.GetBool("upgrade") {
 		return nil
 	}
 
 	// ClientID and ClientSecret cannot be set when Access Token is provided
-	if cmd.Flags().Changed("access-token") && (cmd.Flags().Changed("client-id") || cmd.Flags().Changed("client-secret")) {
+	if viper.IsSet("access-token") && (viper.IsSet("client_id") || viper.IsSet("client_secret")) {
 		return fmt.Errorf("cannot specify Client ID or Client Secret when Access Token is provided")
 	}
 
 	// Region must be specified when using Access Token
-	if cmd.Flags().Changed("access-token") && !cmd.Flags().Changed("cloud") {
+	if viper.IsSet("access_token") && !viper.IsSet("cloud") {
 		return fmt.Errorf("the Cloud region must be specified when using Access Token")
 	}
 
-	if !cmd.Flags().Changed("access-token") && !cmd.Flags().Changed("client-id") && !viper.IsSet("client_id") {
+	if !viper.IsSet("access_token") && !viper.IsSet("client_id") {
 		return fmt.Errorf("the Client ID must be specified. See https://falcon.crowdstrike.com/api-clients-and-keys/clients to create or update OAuth2 credentials")
 	}
 
-	if !cmd.Flags().Changed("access-token") && !cmd.Flags().Changed("client-secret") && !viper.IsSet("client_secret") {
+	if !viper.IsSet("access_token") && !viper.IsSet("client_secret") {
 		return fmt.Errorf("the Client Secret must be specified. See https://falcon.crowdstrike.com/api-clients-and-keys/clients to create or update OAuth2 credentials")
 	}
 
-	if cmd.Flags().Changed("client-id") && viper.GetString("client-id") == "" {
+	if viper.GetString("client_id") == "" {
 		return fmt.Errorf("the Client ID cannot be empty")
 	}
 
-	if cmd.Flags().Changed("client-secret") && viper.GetString("client-secret") == "" {
+	if viper.GetString("client_secret") == "" {
 		return fmt.Errorf("the Client Secret cannot be empty")
 	}
 
-	if err := inputValidation(viper.GetString("client-id"), "^[a-zA-Z0-9]{32}$"); err != nil {
+	if err := inputValidation(viper.GetString("client_id"), "^[a-zA-Z0-9]{32}$"); err != nil {
 		return fmt.Errorf("invalid OAuth Client ID format: %v", err)
 	}
 
-	if err := inputValidation(viper.GetString("client-secret"), "^[a-zA-Z0-9]{40}$"); err != nil {
+	if err := inputValidation(viper.GetString("client_secret"), "^[a-zA-Z0-9]{40}$"); err != nil {
 		return fmt.Errorf("invalid OAuth Client Secret format: %v", err)
 	}
 
@@ -314,7 +322,7 @@ func preRunValidation(cmd *cobra.Command) error {
 		return fmt.Errorf("invalid CID format: %v", err)
 	}
 
-	if err := inputValidation(viper.GetString("member-cid"), "^[0-9a-fA-F]{32}-[0-9a-fA-F]{2}$"); err != nil {
+	if err := inputValidation(viper.GetString("member_cid"), "^[0-9a-fA-F]{32}-[0-9a-fA-F]{2}$"); err != nil {
 		return fmt.Errorf("invalid member CID format: %v", err)
 	}
 
@@ -326,14 +334,14 @@ func preRunValidation(cmd *cobra.Command) error {
 		return fmt.Errorf("invalid Falcon Sensor tag format: %v", err)
 	}
 
-	sVer := viper.GetString("sensor-version")
+	sVer := viper.GetString("sensor_version")
 	if sVer != "latest" && sVer != "" {
 		if err := inputValidation(sVer, "^[0-9]+.[0-9]+.[0-9]+$"); err != nil {
 			return fmt.Errorf("invalid Falcon Sensor version format: %v", err)
 		}
 	}
 
-	if fc.ProxyDisable && (fc.ProxyHost != "" || fc.ProxyPort != "") {
+	if viper.GetBool("proxy_disable") && (viper.GetString("proxy_host") != "" || viper.GetString("proxy_port") != "") {
 		return fmt.Errorf("cannot specify proxy host or port when using --disable-proxy")
 	}
 
@@ -341,16 +349,16 @@ func preRunValidation(cmd *cobra.Command) error {
 }
 
 // Run is the main entry point for the root command.
-func Run(cmd *cobra.Command, args []string) {
-	if fi.UserAgent != "" {
-		fi.UserAgent = fmt.Sprintf("falcon-installer/%s %s", version.Version, fi.UserAgent)
+func Run(_ *cobra.Command, _ []string) {
+	if cfg.UserAgent != "" {
+		cfg.UserAgent = fmt.Sprintf("falcon-installer/%s %s", version.Version, cfg.UserAgent)
 	} else {
-		fi.UserAgent = fmt.Sprintf("falcon-installer/%s", version.Version)
+		cfg.UserAgent = fmt.Sprintf("falcon-installer/%s", version.Version)
 	}
-	slog.Debug("User agent string", "UserAgent", fi.UserAgent)
+	slog.Debug("User agent string", "UserAgent", cfg.UserAgent)
 
-	if targetOS == "windows" && fi.ConfigureImage {
-		fc.NoStart = true
+	if targetOS == "windows" && cfg.ConfigureImage {
+		cfg.SensorConfig.NoStart = true
 	}
 
 	osName, osVersion, err := osutils.ReadEtcRelease(targetOS)
@@ -361,21 +369,23 @@ func Run(cmd *cobra.Command, args []string) {
 	slog.Debug("Identified operating system", "OS", osName, "Version", osVersion)
 	osVersion = strings.Split(osVersion, ".")[0]
 
-	fi.Arch = arch
-	fi.OSType = targetOS
-	fi.OsName = osName
-	fi.OsVersion = osVersion
-	fi.SensorConfig = fc
+	cfg.Arch = arch
+	cfg.OSType = targetOS
+	cfg.OsName = osName
+	cfg.OsVersion = osVersion
 
 	switch {
-	case cmd.Flags().Changed("uninstall"):
-		installer.Uninstall(fi)
-	case cmd.Flags().Changed("update"), cmd.Flags().Changed("upgrade"):
-		installer.Update(fi)
+	case viper.GetBool("uninstall"):
+		installer.Uninstall(cfg.FalconInstaller)
+	case viper.GetBool("update"), viper.GetBool("upgrade"):
+		installer.Update(cfg.FalconInstaller)
 	default:
-		slog.Debug("Falcon sensor CLI options", "CID", fc.CID, "ProvisioningToken", fc.ProvisioningToken, "Tags", fc.Tags, "DisableProxy", fc.ProxyDisable, "ProxyHost", fc.ProxyHost, "ProxyPort", fc.ProxyPort)
-		slog.Debug("Falcon installer options", "Cloud", fi.Cloud, "MemberCID", fi.MemberCID, "SensorUpdatePolicyName", fi.SensorUpdatePolicyName, "GpgKeyFile", fi.GpgKeyFile, "TmpDir", fi.TmpDir, "OsName", fi.OsName, "OsVersion", fi.OsVersion, "OS", fi.OSType, "Arch", fi.Arch)
-		installer.Run(fi)
+		slog.Debug("Falcon sensor CLI options", "CID", cfg.SensorConfig.CID, "ProvisioningToken", cfg.SensorConfig.ProvisioningToken,
+			"Tags", cfg.SensorConfig.Tags, "DisableProxy", cfg.SensorConfig.ProxyDisable, "ProxyHost", cfg.SensorConfig.ProxyHost,
+			"ProxyPort", cfg.SensorConfig.ProxyPort)
+		slog.Debug("Falcon installer options", "Cloud", cfg.Cloud, "MemberCID", cfg.MemberCID, "SensorUpdatePolicyName", cfg.SensorUpdatePolicyName,
+			"GpgKeyFile", cfg.GpgKeyFile, "TmpDir", cfg.TmpDir, "OsName", cfg.OsName, "OsVersion", cfg.OsVersion, "OS", cfg.OSType, "Arch", cfg.Arch)
+		installer.Run(cfg.FalconInstaller)
 	}
 }
 
@@ -459,12 +469,14 @@ func bindCobraFlags(cmd *cobra.Command) {
 	viper := viper.GetViper()
 
 	cmd.Flags().VisitAll(func(f *pflag.Flag) {
-		// Apply the viper config value to the flag when the flag is not set and viper has a value
-		if !f.Changed && viper.IsSet(f.Name) {
-			val := viper.Get(f.Name)
-			if err := cmd.Flags().Set(f.Name, fmt.Sprintf("%v", val)); err != nil {
-				log.Fatalf("Error setting flag %s: %v", f.Name, err)
-			}
+		viperKey := strings.ReplaceAll(f.Name, "-", "_")
+
+		if err := viper.BindPFlag(viperKey, f); err != nil {
+			log.Printf("Error binding flag %s to viper: %v", f.Name, err)
+		}
+
+		if f.DefValue != "" || viper.IsSet(viperKey) {
+			viper.SetDefault(viperKey, f.DefValue)
 		}
 	})
 }

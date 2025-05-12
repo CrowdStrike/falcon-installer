@@ -124,6 +124,7 @@ type FalconInstaller struct {
 
 // Run installs the Falcon sensor on the system.
 func Run(fc FalconInstaller) {
+	slog.Debug("Starting Falcon sensor installation")
 	falconInstalled, err := osutils.FalconInstalled(fc.OSType)
 	if err != nil {
 		log.Fatalf("Error checking if Falcon sensor is installed: %v", err)
