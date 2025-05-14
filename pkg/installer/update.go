@@ -40,6 +40,7 @@ import (
 
 // Update will update the sensor version if a newer version is available or if the force flag is set when sensor policies are not in use.
 func Update(fc FalconInstaller) {
+	slog.Debug("Updating the Falcon sensor")
 	// Check if Falcon is installed
 	falconInstalled, err := osutils.FalconInstalled(fc.OSType)
 	if err != nil {
@@ -119,7 +120,6 @@ func matchAPIversion(systemVersion string, os string) string {
 		parts := strings.Split(systemVersion, "-")
 		if len(parts) != 2 {
 			return systemVersion // Return as-is if format doesn't match expected pattern
-
 		}
 
 		// Split the version part by "." to get individual components

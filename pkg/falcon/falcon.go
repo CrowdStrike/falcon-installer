@@ -75,7 +75,22 @@ func GetMaintenanceToken(client *client.CrowdStrikeAPISpecification, aid string)
 		},
 	)
 	if err != nil {
-		log.Fatal(falcon.ErrorExplain(err))
+		errPayload := falcon.ErrorExtractPayload(err)
+		if errPayload == nil {
+			log.Fatal(falcon.ErrorExplain(err))
+		}
+
+		bytes, mErr := errPayload.MarshalBinary()
+		if mErr != nil {
+			log.Fatal(mErr)
+		}
+
+		if strings.Contains(string(bytes), "\"code\":403,\"message\":\"access denied, authorization failed\"") {
+			slog.Warn("Skipping getting maintenance token because the OAuth scope does not have permission to read maintenance tokens. Please provide the token via CLI or update the OAuth2 client with the `Sensor Update Policies: Write` scope.")
+			return ""
+		} else {
+			log.Fatal(falcon.ErrorExplain(err))
+		}
 	}
 
 	payload := res.GetPayload()

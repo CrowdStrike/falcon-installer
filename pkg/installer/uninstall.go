@@ -39,6 +39,7 @@ import (
 
 // Uninstall removes the Falcon Sensor from the target system.
 func Uninstall(fc FalconInstaller) {
+	slog.Debug("Uninstalling Falcon sensor")
 	falconInstalled, err := osutils.FalconInstalled(fc.OSType)
 	if err != nil {
 		log.Fatalf("Error checking if Falcon sensor is installed: %v", err)
@@ -70,7 +71,12 @@ func Uninstall(fc FalconInstaller) {
 			}
 
 			slog.Debug("Getting maintenance token for uninstallation using the AID", "AID", aid)
-			fc.SensorConfig.MaintenanceToken = falcon.GetMaintenanceToken(client, aid)
+			apiToken := falcon.GetMaintenanceToken(client, aid)
+			if apiToken == "" && fc.SensorConfig.MaintenanceToken == "" {
+				log.Fatal("Error: Failed to get maintenance token for uninstallation. You must either provide a maintenance token via the CLI or update your OAuth2 client scope")
+			}
+
+			fc.SensorConfig.MaintenanceToken = apiToken
 		}
 
 		if err := fc.uninstallSensor(fc.SensorConfig.MaintenanceToken); err != nil {
