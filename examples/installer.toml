@@ -1,0 +1,6 @@
+# Falcon Installer TOML Configuration
+client_id = "MY_CLIENT_ID"
+client_secret = "MY_CLIENT_SECRET"
+configure_image = true
+tags = "server,production"
+vdi = true

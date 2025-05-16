@@ -137,6 +137,14 @@ falcon-installer --client-id YOUR_CLIENT_ID --client-secret YOUR_CLIENT_SECRET -
 falcon-installer --client-id YOUR_CLIENT_ID --client-secret YOUR_CLIENT_SECRET --update --sensor-version 1.42.1234
 ```
 
+### Using a Configuration File
+
+You can also use a configuration file to specify installation options. The installer supports YAML, JSON, INI, TOML, and HCL formats. See the [examples](examples) directory for sample configuration files.
+
+```shell
+falcon-installer --config-file /path/to/config/file
+```
+
 ## Contributing
 
 We welcome contributions that improve the installation and distribution processes of the Falcon Sensor. Please ensure that your contributions align with our coding standards and pass all CI/CD checks.

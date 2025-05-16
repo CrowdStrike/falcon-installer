@@ -46,7 +46,7 @@ test: fmt vet ## Run tests.
 
 .PHONY: license
 license: addlicense ## Run addlicense to add license to source code
-	$(ADDLICENSE) -c 'CrowdStrike, Inc.' -skip yaml -skip yml -s -f LICENSE $(shell pwd)
+	$(ADDLICENSE) -c 'CrowdStrike, Inc.' -skip yaml -skip yml -skip ini -skip json -skip hcl -skip toml -s -f LICENSE $(shell pwd)
 
 .PHONY: lint
 lint: golangci-lint ## Run golangci-lint linter

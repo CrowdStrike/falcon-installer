@@ -47,9 +47,9 @@ func Load() (*Config, error) {
 
 	c.SensorConfig.CID = viper.GetString("cid")
 	c.SensorConfig.Tags = viper.GetString("tags")
-	c.SensorConfig.ProxyHost = viper.GetString("aph")
+	c.SensorConfig.ProxyHost = viper.GetString("proxy_host")
 	c.SensorConfig.ProxyPort = viper.GetString("proxy_port")
-	c.SensorConfig.ProxyDisable = viper.GetBool("proxy_disable")
+	c.SensorConfig.ProxyDisable = viper.GetBool("disable_proxy")
 	c.SensorConfig.ProvisioningToken = viper.GetString("provisioning_token")
 	c.SensorConfig.MaintenanceToken = viper.GetString("maintenance_token")
 	c.SensorConfig.Restart = viper.GetBool("restart")

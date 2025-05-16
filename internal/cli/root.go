@@ -100,6 +100,7 @@ func rootCmd() *cobra.Command {
 		Run: Run,
 	}
 
+	rootCmd.PersistentFlags().String("config", "", "A falcon-installer configuration file")
 	rootCmd.PersistentFlags().String("tmpdir", defaultTmpDir, "Temporary directory for downloading files")
 	rootCmd.PersistentFlags().Bool("quiet", false, "Suppress all log output")
 	rootCmd.PersistentFlags().Bool("enable-file-logging", false, "Output logs to file")
@@ -232,6 +233,27 @@ func preRunConfig(cmd *cobra.Command, _ []string) {
 	viper.AutomaticEnv()
 	bindCobraFlags(cmd)
 
+	if viper.GetString("config") != "" {
+		viper.AddConfigPath(".")
+		viper.SetConfigFile(viper.GetString("config"))
+
+		if err := viper.ReadInConfig(); err != nil {
+			if err, ok := err.(viper.ConfigFileNotFoundError); ok {
+				log.Fatal(err)
+			}
+		}
+
+		// Check if the config file is an INI file and handle default section
+		if strings.HasSuffix(viper.ConfigFileUsed(), ".ini") {
+			defaultSection := viper.Sub("falcon")
+			if defaultSection != nil {
+				for k, v := range defaultSection.AllSettings() {
+					viper.Set(k, v)
+				}
+			}
+		}
+	}
+
 	cfg, err = config.Load()
 	if err != nil {
 		log.Fatalf("Error loading configuration: %v", err)
@@ -269,6 +291,9 @@ func preRunConfig(cmd *cobra.Command, _ []string) {
 		slog.Debug("Starting falcon-installer", "Version", version.Version)
 		slog.Debug("Verbose output enabled")
 	}
+
+	// Print config file after all the logging is configured
+	slog.Debug("Using the following configuration file", "config", viper.ConfigFileUsed())
 }
 
 // preRunValidation validates the input flags before running the command.
