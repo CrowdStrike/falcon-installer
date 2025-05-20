@@ -127,6 +127,17 @@ func rootCmd() *cobra.Command {
 	}
 	groups["Falcon API Flags"] = apiFlag
 
+	// Cloud Provider flags
+	cspFlag := pflag.NewFlagSet("Vault", pflag.ExitOnError)
+	cspFlag.String("oci-compartment-id", "", "OCI Compartment ID")
+	cspFlag.String("oci-vault-name", "", "OCI Vault Name")
+	rootCmd.Flags().AddFlagSet(cspFlag)
+	err = viper.BindPFlags(cspFlag)
+	if err != nil {
+		log.Fatalf("Error binding vault flags: %v", err)
+	}
+	groups["Vault Flags"] = cspFlag
+
 	// Falcon update flags
 	updateFlag := pflag.NewFlagSet("Update", pflag.ExitOnError)
 	updateFlag.Bool("update", false, "Update the Falcon sensor for when sensor update policies are not in use")
@@ -254,24 +265,19 @@ func preRunConfig(cmd *cobra.Command, _ []string) {
 		}
 	}
 
-	cfg, err = config.Load()
-	if err != nil {
-		log.Fatalf("Error loading configuration: %v", err)
-	}
-
 	verbose := viper.GetBool("verbose")
 	quiet := viper.GetBool("quiet")
 	enableFileLogging := viper.GetBool("enable_file_logging")
+	tmpdir := viper.GetString("tmpdir")
 
-	//create tmp directory if it does not exist
-	if _, err := os.Stat(cfg.TmpDir); os.IsNotExist(err) {
-		if err := os.MkdirAll(cfg.TmpDir, 0700); err != nil {
+	if _, err := os.Stat(tmpdir); os.IsNotExist(err) {
+		if err := os.MkdirAll(tmpdir, 0700); err != nil {
 			log.Fatalf("Error creating temporary directory: %v", err)
 		}
 	}
 
-	if cfg.TmpDir != defaultTmpDir {
-		logFile = fmt.Sprintf("%s%s%s", cfg.TmpDir, string(os.PathSeparator), "falcon-installer.log")
+	if tmpdir != defaultTmpDir {
+		logFile = fmt.Sprintf("%s%s%s", tmpdir, string(os.PathSeparator), "falcon-installer.log")
 	}
 
 	if quiet {
@@ -294,6 +300,11 @@ func preRunConfig(cmd *cobra.Command, _ []string) {
 
 	// Print config file after all the logging is configured
 	slog.Debug("Using the following configuration file", "config", viper.ConfigFileUsed())
+
+	cfg, err = config.Load()
+	if err != nil {
+		log.Fatalf("Error loading configuration: %v", err)
+	}
 }
 
 // preRunValidation validates the input flags before running the command.
