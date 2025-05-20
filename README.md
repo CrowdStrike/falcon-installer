@@ -26,6 +26,7 @@ Usage:
   falcon-installer [flags]
 
 Flags:
+      --config string         A falcon-installer configuration file
       --enable-file-logging   Output logs to file
   -h, --help                  Print usage information
       --quiet                 Suppress all log output
@@ -57,6 +58,10 @@ Falcon Uninstall Flags:
 
 Falcon Update Flags:
       --update   Update the Falcon sensor for when sensor update policies are not in use
+
+Vault Flags:
+      --oci-compartment-id string   OCI Compartment ID
+      --oci-vault-name string       OCI Vault Name
 ```
 
 ### Linux Specific Arguments

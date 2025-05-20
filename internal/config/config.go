@@ -23,6 +23,10 @@
 package config
 
 import (
+	"fmt"
+	"strings"
+
+	"github.com/crowdstrike/falcon-installer/internal/vault"
 	"github.com/crowdstrike/falcon-installer/pkg/installer"
 	"github.com/spf13/viper"
 )
@@ -32,6 +36,23 @@ type Config struct {
 }
 
 func Load() (*Config, error) {
+	ociVault := viper.GetString("oci_vault_name")
+	ociCompartmentID := viper.GetString("oci_compartment_id")
+
+	if ociVault != "" && ociCompartmentID != "" {
+		// Get secrets from OCI vault
+		secrets, err := vault.GetOCIVaultSecrets(ociCompartmentID, ociVault)
+		if err != nil {
+			return nil, fmt.Errorf("failed to load config: %w", err)
+		}
+		for k, v := range secrets {
+			if strings.Contains(k, "FALCON_") {
+				key, _ := strings.CutPrefix(k, "FALCON_")
+				viper.Set(key, v)
+			}
+		}
+	}
+
 	c := &Config{}
 	c.ClientID = viper.GetString("client_id")
 	c.ClientSecret = viper.GetString("client_secret")

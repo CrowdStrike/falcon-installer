@@ -40,7 +40,7 @@ import (
 	"github.com/crowdstrike/gofalcon/falcon/models"
 )
 
-var enterpriseLinux = []string{"rhel", "centos", "oracle", "almalinux", "rocky"}
+var enterpriseLinux = []string{"rhel", "centos", "oracle", "ol", "oraclelinux", "almalinux", "rocky"}
 
 // GetCID gets the Falcon CID from the CrowdStrike API using the SensorDownload API.
 func GetCID(ctx context.Context, client *client.CrowdStrikeAPISpecification) (string, error) {
