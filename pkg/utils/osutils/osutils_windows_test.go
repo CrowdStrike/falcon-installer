@@ -32,21 +32,10 @@ import (
 func TestWinFalconInstalled(t *testing.T) {
 	got, err := FalconInstalled("windows")
 	if err != nil {
-		t.Error(err)
+		t.Errorf("Expected no error when checking for Falcon service, got: %v", err)
 	}
-
 	if got {
-		t.Errorf("Expected Falcon Sensor not to be installed: Got: %v, Error: %v", got, err)
-	}
-
-	scQueryCmnd = "noop.exe"
-	got, err = FalconInstalled("windows")
-	if err == nil {
-		t.Errorf("Expected error: %v", err)
-	}
-
-	if got {
-		t.Errorf("Expected Falcon Sensor not to be installed: Got: %v, Error: %v", got, err)
+		t.Errorf("Expected Falcon Sensor not to be installed: Got: %v", got)
 	}
 
 	got, err = FalconInstalled("unknown")
@@ -123,42 +112,40 @@ func TestPackageManagerLock(t *testing.T) {
 }
 
 func TestSCQuery(t *testing.T) {
-	scQueryCmnd = "sc.exe"
+	// Test for a service that likely doesn't exist
 	got, err := scQuery("csagent")
 	if err != nil {
-		t.Error(err)
+		t.Errorf("Expected nil error for non-existent service, got: %v", err)
 	}
-
 	if got {
-		t.Errorf("Expected service not to be running: Got: %v, Error: %v", got, err)
+		t.Errorf("Expected service not to exist: Got: %v", got)
 	}
 
+	// Test with empty service name
 	got, err = scQuery("")
 	if err == nil {
-		t.Errorf("Expected error: %v", err)
+		t.Errorf("Expected error for empty service name")
 	}
-
 	if got {
-		t.Errorf("Expected service not to be running: Got: %v, Error: %v", got, err)
+		t.Errorf("Expected false result for empty service name: Got: %v", got)
 	}
 
-	got, err = scQuery("dnscache")
+	// Test with a service that should exist
+	got, err = scQuery("W32Time")
 	if err != nil {
-		t.Error(err)
+		t.Errorf("Error querying W32Time service: %v", err)
 	}
-
 	if !got {
-		t.Errorf("Expected service to be running: Got: %v, Error: %v", got, err)
+		t.Errorf("Expected W32Time service to exist")
 	}
 
-	scQueryCmnd = "noop.exe"
-	got, err = scQuery("csagent")
-	if err == nil {
-		t.Errorf("Expected error: %v", err)
+	// Test with a non-existent service name
+	got, err = scQuery("nonexistent_test_service")
+	if err != nil {
+		t.Errorf("Expected nil error for non-existent service, got: %v", err)
 	}
-
 	if got {
-		t.Errorf("Expected service not to be running: Got: %v, Error: %v", got, err)
+		t.Errorf("Expected service not to exist: Got: %v", got)
 	}
 }
 

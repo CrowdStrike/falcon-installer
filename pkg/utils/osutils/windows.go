@@ -29,7 +29,9 @@ import (
 	"fmt"
 	"strings"
 
+	"golang.org/x/sys/windows"
 	"golang.org/x/sys/windows/registry"
+	"golang.org/x/sys/windows/svc/mgr"
 )
 
 // InstalledFalconVersion returns the installed version of the Falcon Sensor on the target OS.
@@ -71,4 +73,28 @@ func InstalledFalconVersion(targetOS string) (string, error) {
 
 	// If we've checked all subkeys and didn't find CrowdStrike Falcon
 	return "", fmt.Errorf("CrowdStrike Falcon version not found in registry")
+}
+
+// scQuery queries the Windows service manager for the presence of a service.
+func scQuery(name string) (bool, error) {
+	// Connect to the Windows service manager
+	m, err := mgr.Connect()
+	if err != nil {
+		return false, fmt.Errorf("failed to connect to service manager: %w", err)
+	}
+	defer m.Disconnect()
+
+	// Try to open the service
+	s, err := m.OpenService(name)
+	if err != nil {
+		// Check specifically for the "service does not exist" error
+		if err == windows.ERROR_SERVICE_DOES_NOT_EXIST {
+			return false, nil
+		}
+		return false, fmt.Errorf("failed to open service %s: %w", name, err)
+	}
+
+	// Service exists, close it and return true
+	s.Close()
+	return true, nil
 }
