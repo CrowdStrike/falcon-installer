@@ -25,7 +25,6 @@ package osutils
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -33,10 +32,7 @@ import (
 	"github.com/crowdstrike/falcon-installer/pkg/dpkg"
 	"github.com/crowdstrike/falcon-installer/pkg/pkgutil"
 	"github.com/crowdstrike/falcon-installer/pkg/rpm"
-	"github.com/crowdstrike/falcon-installer/pkg/utils"
 )
-
-var scQueryCmnd = "sc.exe"
 
 // FalconInstalled checks if the Falcon Sensor is installed on the target OS.
 func FalconInstalled(targetOS string) (bool, error) {
@@ -172,7 +168,7 @@ func isLockFileInUse(lockFile string) (bool, error) {
 	return false, nil
 }
 
-// packageManagerQuery queries the linux package manager for the presence of a package.
+// packageManagerQuery queries the OS package manager for the presence of a package.
 func packageManagerQuery(name string) (bool, error) {
 	switch {
 	case rpm.IsRpmInstalled():
@@ -196,23 +192,4 @@ func packageManagerQuery(name string) (bool, error) {
 	}
 
 	return false, fmt.Errorf("unsupported package manager for package query")
-}
-
-// scQuery queries the Windows service manager for the presence of a service.
-func scQuery(name string) (bool, error) {
-	var err error
-	cmd, err := exec.LookPath(scQueryCmnd)
-	if err != nil {
-		return false, fmt.Errorf("unable to find sc.exe: %v", err)
-	}
-
-	args := []string{"query", name}
-	if stdout, _, err := utils.RunCmd(cmd, args); err != nil {
-		if strings.Contains(string(stdout), "The specified service does not exist as an installed service") {
-			return false, nil
-		}
-		return false, fmt.Errorf("error running sc query: %v", err)
-	}
-
-	return true, nil
 }

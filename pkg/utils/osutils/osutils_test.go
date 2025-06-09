@@ -214,3 +214,14 @@ func TestInstalledFalconVersion(t *testing.T) {
 	}
 
 }
+
+func TestScQuery(t *testing.T) {
+	sc, err := scQuery("test_service")
+	if err == nil {
+		t.Errorf("Expected error on non-Windows platform, got nil")
+	}
+
+	if sc {
+		t.Errorf("Expected false result on non-Windows platform, got: %v", sc)
+	}
+}

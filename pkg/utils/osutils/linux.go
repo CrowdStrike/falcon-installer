@@ -75,3 +75,9 @@ func InstalledFalconVersion(targetOS string) (string, error) {
 		return "", fmt.Errorf("unsupported OS for getting Falcon Sensor version: %s", targetOS)
 	}
 }
+
+// scQuery always returns false for non-Windows operating systems and is used as a placeholder for Windows-specific functionality.
+func scQuery(_ string) (bool, error) {
+	// This is a non-Windows implementation that always returns false
+	return false, fmt.Errorf("service control manager queries not supported on this platform")
+}
