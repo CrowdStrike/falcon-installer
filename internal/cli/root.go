@@ -29,6 +29,7 @@ import (
 	"log/slog"
 	"maps"
 	"os"
+	"path/filepath"
 	"regexp"
 	"runtime"
 	"slices"
@@ -37,6 +38,7 @@ import (
 	"github.com/crowdstrike/falcon-installer/internal/config"
 	"github.com/crowdstrike/falcon-installer/internal/version"
 	"github.com/crowdstrike/falcon-installer/pkg/installer"
+	"github.com/crowdstrike/falcon-installer/pkg/utils"
 	"github.com/crowdstrike/falcon-installer/pkg/utils/osutils"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -244,9 +246,15 @@ func preRunConfig(cmd *cobra.Command, _ []string) {
 	viper.AutomaticEnv()
 	bindCobraFlags(cmd)
 
-	if viper.GetString("config") != "" {
+	cfgFile := viper.GetString("config")
+	if cfgFile != "" {
 		viper.AddConfigPath(".")
-		viper.SetConfigFile(viper.GetString("config"))
+		viper.SetConfigFile(cfgFile)
+
+		cFileType := filepath.Ext(cfgFile)
+		if cFileType == ".settings" {
+			viper.SetConfigType("json")
+		}
 
 		if err := viper.ReadInConfig(); err != nil {
 			if err, ok := err.(viper.ConfigFileNotFoundError); ok {
@@ -255,11 +263,45 @@ func preRunConfig(cmd *cobra.Command, _ []string) {
 		}
 
 		// Check if the config file is an INI file and handle default section
-		if strings.HasSuffix(viper.ConfigFileUsed(), ".ini") {
+		if cFileType == ".ini" {
 			defaultSection := viper.Sub("falcon")
 			if defaultSection != nil {
 				for k, v := range defaultSection.AllSettings() {
 					viper.Set(k, v)
+				}
+			}
+		}
+
+		// Check if the config file is a JSON file for Azure VM Extension
+		if cFileType == ".settings" && viper.IsSet("runtimeSettings") {
+			handler := viper.Sub("runtimeSettings.0.handlerSettings")
+			publicSettings := handler.Sub("publicSettings")
+			if publicSettings != nil {
+				for k, v := range publicSettings.AllSettings() {
+					viper.Set(k, v)
+				}
+			}
+
+			protectedSettings := handler.Get("protectedSettings")
+			if protectedSettings != nil {
+				thumbprint := handler.GetString("protectedSettingsCertThumbprint")
+
+				executablePath, err := os.Executable()
+				if err != nil {
+					fmt.Println("Error:", err)
+					return
+				}
+
+				// Get the directory of the executable.
+				executableDir := filepath.Dir(executablePath)
+				parentDir := filepath.Dir(executableDir)
+				pSettings, err := utils.DecryptProtectedSettings(viper.GetString("runtimeSettings.0.handlerSettings.protectedSettings"), thumbprint, parentDir)
+				if err != nil {
+					log.Fatalf("failed to decrypt Azure protected settings: %v", err)
+				} else {
+					for k, v := range pSettings {
+						viper.Set(k, v)
+					}
 				}
 			}
 		}
