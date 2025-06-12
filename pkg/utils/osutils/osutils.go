@@ -124,7 +124,22 @@ func PackageManagerLock() (bool, error) {
 	case rpm.IsRpmInstalled():
 		return isLockFileInUse("/var/lib/rpm/.rpm.lock")
 	case dpkg.IsDpkgInstalled():
-		return isLockFileInUse("/var/lib/dpkg/lock")
+		// Check both lock files used by dpkg/apt
+		lockMain, err := isLockFileInUse("/var/lib/dpkg/lock")
+		if err != nil {
+			return false, err
+		}
+		if lockMain {
+			return lockMain, nil
+		}
+
+		// Also check the frontend lock
+		lockFrontend, err := isLockFileInUse("/var/lib/dpkg/lock-frontend")
+		if err != nil {
+			return false, err
+		}
+
+		return lockFrontend, nil
 	default:
 		return false, nil
 	}
