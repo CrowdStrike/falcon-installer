@@ -26,7 +26,10 @@
 package osutils
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
+	"os/exec"
 	"strings"
 
 	"golang.org/x/sys/windows"
@@ -97,4 +100,67 @@ func scQuery(name string) (bool, error) {
 	// Service exists, close it and return true
 	s.Close()
 	return true, nil
+}
+
+// DecryptProtectedSettings decrypts CMS encrypted data using the provided certificate and private key.
+func DecryptProtectedSettings(protectedSettings string, thumbprint string, _ string) (map[string]any, error) {
+	// Define the PowerShell function and call it with our parameters
+	psScript := `
+function Decrypt
+{
+    [CmdletBinding()]
+    [OutputType([System.String])]
+    param(
+        [Parameter(Position=0, Mandatory=$true)][ValidateNotNullOrEmpty()][System.String]
+        $EncryptedBase64String,
+        [Parameter(Position=1, Mandatory=$true)][ValidateNotNullOrEmpty()][System.String]
+        $CertThumbprint
+    )
+    [System.Reflection.Assembly]::LoadWithPartialName("System.Security") | out-null
+    $encryptedByteArray = [Convert]::FromBase64String($EncryptedBase64String)
+    $envelope = New-Object System.Security.Cryptography.Pkcs.EnvelopedCms
+
+    # get certificate from local machine store
+    $store = new-object System.Security.Cryptography.X509Certificates.X509Store([System.Security.Cryptography.X509Certificates.StoreLocation]::LocalMachine)
+    $store.open([System.Security.Cryptography.X509Certificates.OpenFlags]::ReadOnly)
+    $cert = $store.Certificates | Where-Object {$_.thumbprint -eq $CertThumbprint}
+    if($cert) {
+        $envelope.Decode($encryptedByteArray)
+        $envelope.Decrypt($cert)
+        $decryptedBytes = $envelope.ContentInfo.Content
+        $decryptedResult = [System.Text.Encoding]::UTF8.GetString($decryptedBytes)
+        Return $decryptedResult
+    }
+    Return ""
+}
+
+$result = Decrypt -EncryptedBase64String "` + protectedSettings + `" -CertThumbprint "` + thumbprint + `"
+Write-Output $result
+`
+
+	// Execute the PowerShell script
+	cmd := exec.Command("powershell", "-ExecutionPolicy", "Bypass", "-Command", psScript)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return nil, fmt.Errorf("PowerShell execution failed: %w\nOutput: %s", err, string(output))
+	}
+
+	// Check if output is empty
+	if len(bytes.TrimSpace(output)) == 0 {
+		return nil, fmt.Errorf("decryption returned empty result, certificate with thumbprint %s might not be found", thumbprint)
+	}
+
+	// Parse the JSON output
+	var result map[string]any
+	if err := json.Unmarshal(output, &result); err != nil {
+		// If JSON parsing fails, return both the error and the output for inspection
+		previewLen := 100
+		if len(output) < previewLen {
+			previewLen = len(output)
+		}
+		return nil, fmt.Errorf("failed to parse JSON: %w (output: %s)",
+			err, string(output[:previewLen]))
+	}
+
+	return result, nil
 }
