@@ -38,7 +38,6 @@ import (
 	"github.com/crowdstrike/falcon-installer/internal/config"
 	"github.com/crowdstrike/falcon-installer/internal/version"
 	"github.com/crowdstrike/falcon-installer/pkg/installer"
-	"github.com/crowdstrike/falcon-installer/pkg/utils"
 	"github.com/crowdstrike/falcon-installer/pkg/utils/osutils"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -295,7 +294,7 @@ func preRunConfig(cmd *cobra.Command, _ []string) {
 				// Get the directory of the executable.
 				executableDir := filepath.Dir(executablePath)
 				parentDir := filepath.Dir(executableDir)
-				pSettings, err := utils.DecryptProtectedSettings(viper.GetString("runtimeSettings.0.handlerSettings.protectedSettings"), thumbprint, parentDir)
+				pSettings, err := osutils.DecryptProtectedSettings(viper.GetString("runtimeSettings.0.handlerSettings.protectedSettings"), thumbprint, parentDir)
 				if err != nil {
 					log.Fatalf("failed to decrypt Azure protected settings: %v", err)
 				} else {

@@ -24,10 +24,6 @@ package utils
 
 import (
 	"bytes"
-	"crypto/x509"
-	"encoding/base64"
-	"encoding/json"
-	"encoding/pem"
 	"fmt"
 	"io"
 	"os"
@@ -35,8 +31,6 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
-
-	"go.mozilla.org/pkcs7"
 )
 
 // BoolToInt converts a boolean to an integer.
@@ -140,75 +134,4 @@ func OpenFileForWriting(dir, filename string) (*os.File, error) {
 	}
 
 	return os.OpenFile(safeLocation, os.O_CREATE|os.O_WRONLY, 0600)
-}
-
-// DecryptProtectedSettings decrypts CMS encrypted data using the provided certificate and private key.
-func DecryptProtectedSettings(protectedSettings string, thumbprint string, keypath string) (map[string]any, error) {
-	// Decode the base64 encoded protected settings
-	decodedData, err := base64.StdEncoding.DecodeString(protectedSettings)
-	if err != nil {
-		return nil, fmt.Errorf("failed to decode base64: %w", err)
-	}
-
-	privateKeyPath := fmt.Sprintf("%s/%s.prv", keypath, thumbprint)
-	certPath := fmt.Sprintf("%s/%s.crt", keypath, thumbprint)
-
-	// Read the private key
-	privateKeyPEM, err := os.ReadFile(privateKeyPath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read private key: %w", err)
-	}
-
-	// Parse the private key
-	block, _ := pem.Decode(privateKeyPEM)
-	if block == nil {
-		return nil, fmt.Errorf("failed to parse PEM block containing the private key")
-	}
-
-	var privateKey interface{}
-	privateKey, err = x509.ParsePKCS8PrivateKey(block.Bytes)
-	if err != nil {
-		// Try PKCS1 if PKCS8 fails
-		privateKey, err = x509.ParsePKCS1PrivateKey(block.Bytes)
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse private key: %w", err)
-		}
-	}
-
-	// Read the certificate
-	certPEM, err := os.ReadFile(certPath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read certificate: %w", err)
-	}
-
-	// Parse the certificate
-	certBlock, _ := pem.Decode(certPEM)
-	if certBlock == nil {
-		return nil, fmt.Errorf("failed to parse PEM block containing the certificate")
-	}
-
-	cert, err := x509.ParseCertificate(certBlock.Bytes)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse certificate: %w", err)
-	}
-
-	// Parse the PKCS7 data
-	p7, err := pkcs7.Parse(decodedData)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse PKCS7 data: %w", err)
-	}
-
-	// Decrypt the data
-	decrypted, err := p7.Decrypt(cert, privateKey)
-	if err != nil {
-		return nil, fmt.Errorf("failed to decrypt: %w", err)
-	}
-
-	// Parse the decrypted JSON data
-	var result map[string]any
-	if err := json.Unmarshal(decrypted, &result); err != nil {
-		return nil, fmt.Errorf("failed to parse JSON: %w", err)
-	}
-
-	return result, nil
 }
