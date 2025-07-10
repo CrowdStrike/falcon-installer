@@ -41,7 +41,7 @@ Falcon API Flags:
       --cloud string                  Falcon cloud abbreviation (e.g. us-1, us-2, eu-1, us-gov-1) (default "autodiscover")
       --member-cid string             Member CID for MSSP (for cases when OAuth2 authenticates multiple CIDs)
       --sensor-update-policy string   The sensor update policy name to use for sensor installation (default "platform_default")
-      --sensor-version string         The sensor version to update or install (overrides sensor-update-policy) (default "latest")
+      --sensor-version string         The sensor version to update or install (overrides sensor-update-policy)
       --user-agent string             User agent string to append to use for API requests
 
 Falcon Sensor Flags:
