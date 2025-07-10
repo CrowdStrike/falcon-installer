@@ -270,7 +270,7 @@ func GetSensorUpdatePolicies(client *client.CrowdStrikeAPISpecification, osType 
 func GetSensors(client *client.CrowdStrikeAPISpecification, osName string, osVersion string, osType string, arch string, sensorUpdatePolicyName string, sensorVersion string) []*models.DomainSensorInstallerV2 {
 	var filter *string
 
-	if sensorVersion == "latest" {
+	if sensorVersion == "" {
 		sensorVersion = GetSensorUpdatePolicies(client, osType, arch, sensorUpdatePolicyName)
 	}
 

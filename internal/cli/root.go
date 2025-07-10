@@ -53,7 +53,6 @@ var (
 	defaultTmpDir                      = fmt.Sprint(os.TempDir(), string(os.PathSeparator), "falcon")
 	defaultProvisioningWaitTime uint64 = 1200000
 	defaultSensorUpdatePolicy          = "platform_default"
-	defaultSensorVersion               = "latest"
 	defaultCloudRegion                 = "autodiscover"
 	logFile                            = fmt.Sprint(defaultTmpDir, string(os.PathSeparator), "falcon-installer.log")
 	cfg                         *config.Config
@@ -119,7 +118,7 @@ func rootCmd() *cobra.Command {
 	apiFlag.String("member-cid", "", "Member CID for MSSP (for cases when OAuth2 authenticates multiple CIDs)")
 	apiFlag.String("cloud", defaultCloudRegion, "Falcon cloud abbreviation (e.g. us-1, us-2, eu-1, us-gov-1)")
 	apiFlag.String("sensor-update-policy", defaultSensorUpdatePolicy, "The sensor update policy name to use for sensor installation")
-	apiFlag.String("sensor-version", defaultSensorVersion, "The sensor version to update or install (overrides sensor-update-policy)")
+	apiFlag.String("sensor-version", "", "The sensor version to update or install (overrides sensor-update-policy)")
 	apiFlag.String("user-agent", "", "User agent string to append to use for API requests")
 	rootCmd.Flags().AddFlagSet(apiFlag)
 	err := viper.BindPFlags(apiFlag)
@@ -412,7 +411,7 @@ func preRunValidation(cmd *cobra.Command) error {
 	}
 
 	sVer := viper.GetString("sensor_version")
-	if sVer != "latest" && sVer != "" {
+	if sVer != "" {
 		if err := inputValidation(sVer, "^[0-9]+.[0-9]+.[0-9]+$"); err != nil {
 			return fmt.Errorf("invalid Falcon Sensor version format: %v", err)
 		}
