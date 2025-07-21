@@ -114,7 +114,7 @@ func (fc FalconInstaller) uninstallLinuxSensor(maintenanceToken string) error {
 	}{
 		{"/usr/bin/dnf", []string{"remove", "-q", "-y", sensorPackage}, nil},
 		{"/usr/bin/yum", []string{"remove", "-q", "-y", sensorPackage}, nil},
-		{"/usr/bin/zypper", []string{"remove", "--quiet", "-y", sensorPackage}, nil},
+		{"/usr/bin/zypper", []string{"--quiet", "remove", "-y", sensorPackage}, nil},
 		{"/usr/bin/apt-get", []string{"purge", "-y", sensorPackage}, []string{"DEBIAN_FRONTEND=noninteractive"}},
 		{"/usr/bin/dpkg", []string{"remove", "--qq", "-y", sensorPackage}, []string{"DEBIAN_FRONTEND=noninteractive"}},
 	}

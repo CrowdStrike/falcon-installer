@@ -168,7 +168,7 @@ func (fc FalconInstaller) updateLinuxSensor(path string, maintenanceToken string
 	}{
 		{"/usr/bin/dnf", []string{"update", "-q", "-y", path}, nil},
 		{"/usr/bin/yum", []string{"update", "-q", "-y", path}, nil},
-		{"/usr/bin/zypper", []string{"update", "--quiet", "-y", path}, nil},
+		{"/usr/bin/zypper", []string{"--quiet", "update", "-y", path}, nil},
 		{"/usr/bin/apt-get", []string{"install", "-y", path}, []string{"DEBIAN_FRONTEND=noninteractive"}},
 		{"/usr/bin/dpkg", []string{"--install", path}, []string{"DEBIAN_FRONTEND=noninteractive"}},
 	}

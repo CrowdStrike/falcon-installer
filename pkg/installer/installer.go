@@ -432,7 +432,7 @@ func (fi FalconInstaller) installLinuxSensor(path string) error {
 	}{
 		{"/usr/bin/dnf", []string{"install", "-q", "-y", path}, nil},
 		{"/usr/bin/yum", []string{"install", "-q", "-y", path}, nil},
-		{"/usr/bin/zypper", []string{"install", "--quiet", "-y", path}, nil},
+		{"/usr/bin/zypper", []string{"--quiet", "install", "-y", path}, nil},
 		{"/usr/bin/apt-get", []string{"install", "-y", path}, []string{"DEBIAN_FRONTEND=noninteractive"}},
 		{"/usr/bin/dpkg", []string{"--install", path}, []string{"DEBIAN_FRONTEND=noninteractive"}},
 	}
