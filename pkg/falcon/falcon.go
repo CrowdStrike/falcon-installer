@@ -324,7 +324,7 @@ func GetSensors(client *client.CrowdStrikeAPISpecification, osName string, osVer
 func QuerySuitableSensor(client *client.CrowdStrikeAPISpecification, osName string, osVersion string, osType string, arch string, sensorUpdatePolicyName string, sensorVersion string) *models.DomainSensorInstallerV2 {
 	for _, sensor := range GetSensors(client, osName, osVersion, osType, arch, sensorUpdatePolicyName, sensorVersion) {
 		if strings.Contains(*sensor.OsVersion, osVersion) {
-			if *sensor.Version == sensorVersion || sensorVersion == "latest" {
+			if *sensor.Version == sensorVersion || sensorVersion == "" {
 				slog.Debug("Found suitable Falcon sensor", "Version", *sensor.Version)
 				return sensor
 			}
