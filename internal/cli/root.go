@@ -305,6 +305,9 @@ func preRunConfig(cmd *cobra.Command, _ []string) {
 		}
 	}
 
+	// Process falcon_ prefixed configuration keys
+	processFalconPrefixedConfigKeys()
+
 	verbose := viper.GetBool("verbose")
 	quiet := viper.GetBool("quiet")
 	enableFileLogging := viper.GetBool("enable_file_logging")
@@ -555,6 +558,25 @@ func bindCobraFlags(cmd *cobra.Command) {
 			viper.SetDefault(viperKey, f.DefValue)
 		}
 	})
+}
+
+// processFalconPrefixedConfigKeys handles configuration keys with falcon_ prefix
+// and maps them to their non-prefixed equivalents in viper.
+// This allows both client_id and falcon_client_id to work in config files.
+func processFalconPrefixedConfigKeys() {
+	allSettings := viper.AllSettings()
+	for key, value := range allSettings {
+		// Check if the key starts with "falcon_"
+		if strings.HasPrefix(strings.ToLower(key), "falcon_") {
+			// Strip the falcon_ prefix
+			strippedKey := strings.TrimPrefix(strings.ToLower(key), "falcon_")
+
+			// Only set if the non-prefixed key is not already set
+			if !viper.IsSet(strippedKey) {
+				viper.Set(strippedKey, value)
+			}
+		}
+	}
 }
 
 // Execute runs the root command.
