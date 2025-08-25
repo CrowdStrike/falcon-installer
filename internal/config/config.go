@@ -53,6 +53,18 @@ func Load() (*Config, error) {
 		}
 	}
 
+	azureVault := viper.GetString("azure_vault_name")
+	if azureVault != "" {
+		// Get secrets from Azure Key Vault
+		secrets, err := vault.GetAzureKeyVaultSecrets(azureVault)
+		if err != nil {
+			return nil, fmt.Errorf("failed to load config: %w", err)
+		}
+		for k, v := range secrets {
+			viper.Set(k, v)
+		}
+	}
+
 	c := &Config{}
 	c.ClientID = viper.GetString("client_id")
 	c.ClientSecret = viper.GetString("client_secret")
