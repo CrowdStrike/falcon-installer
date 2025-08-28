@@ -57,21 +57,22 @@ func TestQuery(t *testing.T) {
 	// Skip pkgutil query if pkgutil is not installed
 	skipPkgUtilTests(t)
 
-	got, err := Query("com.apple.pkg.Safari*")
+	// Test with a package pattern that should exist on macOS
+	got, err := Query("com.apple.files.data-template")
 	if err != nil {
 		t.Error(err)
 	}
 
 	if !got {
-		t.Errorf("Expected pkgutil to be installed: Got: %v, Error: %v", got, err)
+		t.Errorf("Expected files.data-template package to be found: Got: %v, Error: %v", got, err)
 	}
 
-	got, err = Query("unknown")
+	got, err = Query("unknown.nonexistent.package")
 	if err != nil {
 		t.Error(err)
 	}
 
 	if got {
-		t.Errorf("Expected package not to be installed: Got: %v, Error: %v", got, err)
+		t.Errorf("Expected unknown package not to be found: Got: %v, Error: %v", got, err)
 	}
 }

@@ -24,7 +24,6 @@ package config
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/crowdstrike/falcon-installer/internal/vault"
 	"github.com/crowdstrike/falcon-installer/pkg/installer"
@@ -36,33 +35,34 @@ type Config struct {
 }
 
 func Load() (*Config, error) {
+	var secrets map[string]string
+	var err error
+
 	ociVault := viper.GetString("oci_vault_name")
 	ociCompartmentID := viper.GetString("oci_compartment_id")
+	azureVault := viper.GetString("azure_vault_name")
+	awsSecret := viper.GetString("aws_secret_name")
+	awsRegion := viper.GetString("aws_secret_region")
+	gcpVault := viper.GetString("gcp_project_id")
 
-	if ociVault != "" && ociCompartmentID != "" {
-		// Get secrets from OCI vault
-		secrets, err := vault.GetOCIVaultSecrets(ociCompartmentID, ociVault)
-		if err != nil {
-			return nil, fmt.Errorf("failed to load config: %w", err)
-		}
-		for k, v := range secrets {
-			if strings.Contains(k, "FALCON_") {
-				key, _ := strings.CutPrefix(k, "FALCON_")
-				viper.Set(key, v)
-			}
-		}
+	// Check each vault type and load secrets
+	switch {
+	case awsSecret != "" && awsRegion != "":
+		secrets, err = vault.GetAWSSecretsManagerSecrets(awsRegion, awsSecret)
+	case azureVault != "":
+		secrets, err = vault.GetAzureKeyVaultSecrets(azureVault)
+	case gcpVault != "":
+		secrets, err = vault.GetGCPSecretManagerSecrets(gcpVault)
+	case ociVault != "" && ociCompartmentID != "":
+		secrets, err = vault.GetOCIVaultSecrets(ociCompartmentID, ociVault)
 	}
 
-	azureVault := viper.GetString("azure_vault_name")
-	if azureVault != "" {
-		// Get secrets from Azure Key Vault
-		secrets, err := vault.GetAzureKeyVaultSecrets(azureVault)
-		if err != nil {
-			return nil, fmt.Errorf("failed to load config: %w", err)
-		}
-		for k, v := range secrets {
-			viper.Set(k, v)
-		}
+	if err != nil {
+		return &Config{}, fmt.Errorf("failed to load config: %w", err)
+	}
+
+	for k, v := range secrets {
+		viper.Set(k, v)
 	}
 
 	c := &Config{}

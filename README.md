@@ -60,7 +60,10 @@ Falcon Update Flags:
       --update   Update the Falcon sensor for when sensor update policies are not in use
 
 Vault Flags:
+      --aws-secret-name string      AWS Secrets Manager Secret Name
+      --aws-secret-region string    AWS Secrets Manager Region
       --azure-vault-name string     Azure Key Vault Name
+      --gcp-project-id string       GCP Project ID for Secret Manager
       --oci-compartment-id string   OCI Compartment ID
       --oci-vault-name string       OCI Vault Name
 ```
@@ -151,9 +154,24 @@ You can also use a configuration file to specify installation options. The insta
 falcon-installer --config-file /path/to/config/file
 ```
 
-### Using a Cloud Vault
+### Using Cloud Vaults
 
 The Falcon Installer supports retrieving credentials and configuration from cloud vaults, eliminating the need to store sensitive API credentials in configuration files or environment variables.
+
+#### AWS Secrets Manager
+
+AWS Secrets Manager integration uses the AWS SDK's default credential chain, which supports multiple authentication methods including IAM roles, environment variables, and AWS CLI credentials.
+
+**Prerequisites:**
+- AWS Secrets Manager secret containing key-value pairs
+- Authentication configured (IAM role, environment variables, or AWS CLI)
+- Secret contains Falcon configuration as JSON (e.g. `{"FALCON_CLIENT_ID": "...", "falcon-client-secret": "..."}`)
+
+**Usage:**
+```shell
+# Using AWS Secrets Manager
+falcon-installer --aws-secret-name "falcon-credentials" --aws-secret-region "us-east-1"
+```
 
 #### Azure Key Vault
 
@@ -162,12 +180,27 @@ Azure Key Vault integration uses Azure's DefaultAzureCredential authentication, 
 **Prerequisites:**
 - Azure Key Vault with appropriate access permissions
 - Authentication configured (managed identity, Azure CLI, or service principal)
-- Secrets stored with the `falcon-` or `FALCON-` prefix e.g. `FALCON-CLIENT-ID`, `falcon-client-secret`, etc.
+- Secrets stored with the `falcon-` or `FALCON-` prefix (e.g. `FALCON-CLIENT-ID`, `falcon-client-secret`, etc.)
 
 **Usage:**
 ```shell
 # Using Azure Key Vault
 falcon-installer --azure-vault-name "my-keyvault"
+```
+
+#### Google Cloud Secret Manager
+
+GCP Secret Manager integration uses Google's Application Default Credentials (ADC), which supports multiple authentication methods including service accounts, workload identity, and gcloud CLI credentials.
+
+**Prerequisites:**
+- GCP project with Secret Manager API enabled
+- Authentication configured (service account, workload identity, or gcloud CLI)
+- Secrets stored with the `falcon_` or `FALCON_` prefix (e.g. `falcon_client_id`, `FALCON_CLIENT_SECRET`, etc.)
+
+**Usage:**
+```shell
+# Using GCP Secret Manager
+falcon-installer --gcp-project-id "my-project-id"
 ```
 
 #### Oracle Cloud Infrastructure (OCI) Vault
@@ -178,7 +211,7 @@ OCI Vault integration uses Instance Principal authentication, designed for use w
 - OCI Vault in a specified compartment
 - Instance Principal authentication configured
 - Compute instance with appropriate IAM policies
-- Secrets stored with the `falcon_` or `FALCON_` prefix e.g. `FALCON_CLIENT_ID`, `falcon_client_secret`, etc.
+- Secrets stored with the `falcon_` or `FALCON_` prefix (e.g. `FALCON_CLIENT_ID`, `falcon_client_secret`, etc.)
 
 **Usage:**
 ```shell

@@ -95,26 +95,14 @@ func getAzureSecretsFromVaultByName(vaultName string) (map[string]string, error)
 			// Extract secret name from the ID URL
 			secretName := extractSecretNameFromID(string(*secretProps.ID))
 			if secretName == "" {
-				slog.Debug("Skipping secret with empty name", "index", i, "id", *secretProps.ID)
 				continue
 			}
-
-			// Filter: only process secrets that begin with "falcon-" (case-insensitive)
-			if !strings.HasPrefix(strings.ToLower(secretName), "falcon-") {
-				continue
-			}
-
-			slog.Debug("Processing secret",
-				"index", i,
-				"secretName", secretName,
-				"enabled", secretProps.Attributes.Enabled)
+			slog.Debug("Processing secret", "index", i, "secretName", secretName, "enabled", secretProps.Attributes.Enabled)
 
 			// Get the actual secret value
 			secretValue, err := getAzureSecretValue(ctx, client, secretName)
 			if err != nil {
-				slog.Error("Error getting secret value",
-					"secretName", secretName,
-					"error", err)
+				slog.Error("Error getting secret value", "secretName", secretName, "error", err)
 				return nil, fmt.Errorf("error getting secret value for %s: %w", secretName, err)
 			}
 
@@ -138,9 +126,7 @@ func getAzureSecretValue(ctx context.Context, client *azsecrets.Client, secretNa
 	// Get the latest version of the secret
 	resp, err := client.GetSecret(ctx, secretName, "", nil)
 	if err != nil {
-		slog.Error("Failed to get secret",
-			"secretName", secretName,
-			"error", err)
+		slog.Error("Failed to get secret", "secretName", secretName, "error", err)
 		return "", fmt.Errorf("failed to get secret '%s': %w", secretName, err)
 	}
 
