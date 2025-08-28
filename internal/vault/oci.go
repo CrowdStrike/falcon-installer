@@ -27,6 +27,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"log/slog"
+	"strings"
 
 	"github.com/oracle/oci-go-sdk/v65/common"
 	"github.com/oracle/oci-go-sdk/v65/common/auth"
@@ -37,9 +38,7 @@ import (
 
 // GetOCIVaultSecrets retrieves secrets from an Oracle Cloud Infrastructure (OCI) vault.
 func GetOCIVaultSecrets(compartmentID string, vaultName string) (map[string]string, error) {
-	slog.Debug("Starting secret retrieval process",
-		"compartmentID", compartmentID,
-		"vaultName", vaultName)
+	slog.Debug("Starting secret retrieval process", "compartmentID", compartmentID, "vaultName", vaultName)
 
 	// Get secrets from vault
 	secretValues, err := getOCISecretsFromVaultByName(compartmentID, vaultName)
@@ -102,15 +101,11 @@ func getOCISecretsFromVaultByName(compartmentID string, vaultName string) (map[s
 	slog.Debug("Retrieved secrets list", "count", len(secretsList.Items))
 
 	// Get each secret's value
+	secretCount := 0
 	for i, secretSummary := range secretsList.Items {
 		secretID := *secretSummary.Id
 		secretName := *secretSummary.SecretName
-
-		slog.Debug("Processing secret",
-			"index", i,
-			"secretName", secretName,
-			"secretID", secretID,
-			"lifecycleState", secretSummary.LifecycleState)
+		slog.Debug("Processing secret", "index", i, "secretName", secretName, "secretID", secretID)
 
 		// Get secret bundle
 		secretBundleReq := secrets.GetSecretBundleRequest{
@@ -119,10 +114,7 @@ func getOCISecretsFromVaultByName(compartmentID string, vaultName string) (map[s
 
 		secretBundle, err := secretsClient.GetSecretBundle(ctx, secretBundleReq)
 		if err != nil {
-			slog.Error("Error getting secret bundle",
-				"secretName", secretName,
-				"secretID", secretID,
-				"error", err)
+			slog.Error("Error getting secret bundle", "secretName", secretName, "secretID", secretID, "error", err)
 			return nil, fmt.Errorf("error getting secret bundle for %s: %w", secretName, err)
 		}
 
@@ -131,33 +123,32 @@ func getOCISecretsFromVaultByName(compartmentID string, vaultName string) (map[s
 		// Ensure we have Base64SecretBundleContentDetails
 		base64Content, ok := secretBundle.SecretBundleContent.(secrets.Base64SecretBundleContentDetails)
 		if !ok {
-			slog.Error("Unexpected secret content type",
-				"secretName", secretName,
-				"type", contentType)
+			slog.Error("Unexpected secret content type", "secretName", secretName, "type", contentType)
 			return nil, fmt.Errorf("unexpected secret content type for %s: %s", secretName, contentType)
 		}
 
 		// Decode base64 content
 		content := *base64Content.Content
-		slog.Debug("Decoding base64 content",
-			"secretName", secretName,
-			"contentLength", len(content))
+		slog.Debug("Decoding base64 content", "secretName", secretName, "contentLength", len(content))
 
 		decodedContent, err := base64.StdEncoding.DecodeString(content)
 		if err != nil {
-			slog.Error("Error decoding secret",
-				"secretName", secretName,
-				"error", err)
+			slog.Error("Error decoding secret", "secretName", secretName, "error", err)
 			return nil, fmt.Errorf("error decoding secret %s: %w", secretName, err)
 		}
 
-		secretValues[secretName] = string(decodedContent)
-		slog.Debug("Secret decoded successfully",
-			"secretName", secretName,
-			"decodedLength", len(decodedContent))
+		slog.Debug("Secret retrieved successfully", "secretName", secretName)
+
+		// Normalize secret name: remove "falcon_" prefix and replace dashes with underscores
+		normalizedName := strings.TrimPrefix(strings.ReplaceAll(strings.ToLower(secretName), "-", "_"), "falcon_")
+		slog.Debug("Normalized secret name", "secretName", secretName)
+
+		secretValues[normalizedName] = string(decodedContent)
+		slog.Debug("Secret decoded successfully", "secretName", secretName, "normalizedName", normalizedName, "decodedLength", len(decodedContent))
+		secretCount++
 	}
 
-	slog.Debug("Completed secret retrieval", "totalSecrets", len(secretValues))
+	slog.Debug("Completed secret retrieval", "totalSecrets", secretCount)
 	return secretValues, nil
 }
 
@@ -193,18 +184,10 @@ func getOCIVaultIDByName(ctx context.Context, provider common.ConfigurationProvi
 		vaultID := *vault.Id
 		vaultState := vault.LifecycleState
 
-		slog.Debug("Checking vault",
-			"index", i,
-			"vaultName", vaultDisplayName,
-			"vaultID", vaultID,
-			"lifecycleState", vaultState)
+		slog.Debug("Checking vault", "index", i, "vaultName", vaultDisplayName, "vaultID", vaultID, "lifecycleState", vaultState)
 
 		if vaultDisplayName == vaultName {
-			slog.Debug("Found matching vault",
-				"vaultName", vaultName,
-				"vaultID", vaultID,
-				"lifecycleState", vaultState)
-
+			slog.Debug("Found matching vault", "vaultName", vaultName, "vaultID", vaultID, "lifecycleState", vaultState)
 			return vaultID, nil
 		}
 	}
@@ -228,19 +211,10 @@ func getOCIVaultIDByName(ctx context.Context, provider common.ConfigurationProvi
 			vaultID := *vault.Id
 			vaultState := vault.LifecycleState
 
-			slog.Debug("Checking vault",
-				"pageNum", pageNum,
-				"index", i,
-				"vaultName", vaultDisplayName,
-				"vaultID", vaultID,
-				"lifecycleState", vaultState)
+			slog.Debug("Checking vault", "pageNum", pageNum, "index", i, "vaultName", vaultDisplayName, "vaultID", vaultID, "lifecycleState", vaultState)
 
 			if vaultDisplayName == vaultName {
-				slog.Debug("Found matching vault",
-					"vaultName", vaultName,
-					"vaultID", vaultID,
-					"lifecycleState", vaultState,
-					"pageNum", pageNum)
+				slog.Debug("Found matching vault", "vaultName", vaultName, "vaultID", vaultID, "lifecycleState", vaultState, "pageNum", pageNum)
 				return vaultID, nil
 			}
 		}

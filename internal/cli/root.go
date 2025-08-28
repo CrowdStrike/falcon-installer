@@ -129,7 +129,10 @@ func rootCmd() *cobra.Command {
 
 	// Cloud Provider flags
 	cspFlag := pflag.NewFlagSet("Vault", pflag.ExitOnError)
+	cspFlag.String("aws-secret-name", "", "AWS Secrets Manager Secret Name")
+	cspFlag.String("aws-secret-region", "", "AWS Secrets Manager Region")
 	cspFlag.String("azure-vault-name", "", "Azure Key Vault Name")
+	cspFlag.String("gcp-project-id", "", "GCP Project ID for Secret Manager")
 	cspFlag.String("oci-compartment-id", "", "OCI Compartment ID")
 	cspFlag.String("oci-vault-name", "", "OCI Vault Name")
 	rootCmd.Flags().AddFlagSet(cspFlag)
