@@ -41,6 +41,7 @@ func Load() (*Config, error) {
 	ociVault := viper.GetString("oci_vault_name")
 	ociCompartmentID := viper.GetString("oci_compartment_id")
 	azureVault := viper.GetString("azure_vault_name")
+	azureManagedIdentityClientID := viper.GetString("azure_managed_identity_client_id")
 	awsSecret := viper.GetString("aws_secret_name")
 	awsRegion := viper.GetString("aws_secret_region")
 	gcpVault := viper.GetString("gcp_project_id")
@@ -50,7 +51,7 @@ func Load() (*Config, error) {
 	case awsSecret != "" && awsRegion != "":
 		secrets, err = vault.GetAWSSecretsManagerSecrets(awsRegion, awsSecret)
 	case azureVault != "":
-		secrets, err = vault.GetAzureKeyVaultSecrets(azureVault)
+		secrets, err = vault.GetAzureKeyVaultSecrets(azureVault, azureManagedIdentityClientID)
 	case gcpVault != "":
 		secrets, err = vault.GetGCPSecretManagerSecrets(gcpVault)
 	case ociVault != "" && ociCompartmentID != "":

@@ -28,17 +28,21 @@ import (
 	"log/slog"
 	"strings"
 
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
 	"github.com/Azure/azure-sdk-for-go/sdk/keyvault/azsecrets"
 )
 
 // GetAzureKeyVaultSecrets retrieves secrets from an Azure Key Vault.
-func GetAzureKeyVaultSecrets(vaultName string) (map[string]string, error) {
+// If managedIdentityClientID is provided, it will use User Assigned Managed Identity for authentication.
+// If managedIdentityClientID is empty, it will use DefaultAzureCredential (which includes System Assigned Managed Identity).
+func GetAzureKeyVaultSecrets(vaultName, managedIdentityClientID string) (map[string]string, error) {
 	slog.Debug("Starting secret retrieval process",
-		"vaultName", vaultName)
+		"vaultName", vaultName,
+		"UserAssignedManagedIdentity", managedIdentityClientID != "")
 
 	// Get secrets from vault
-	secretValues, err := getAzureSecretsFromVaultByName(vaultName)
+	secretValues, err := getAzureSecretsFromVaultByName(vaultName, managedIdentityClientID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get secrets: %w", err)
 	}
@@ -47,7 +51,9 @@ func GetAzureKeyVaultSecrets(vaultName string) (map[string]string, error) {
 }
 
 // getAzureSecretsFromVaultByName retrieves all secrets from an Azure Key Vault by name and returns them as a map of secret name to secret value.
-func getAzureSecretsFromVaultByName(vaultName string) (map[string]string, error) {
+func getAzureSecretsFromVaultByName(vaultName, managedIdentityClientID string) (map[string]string, error) {
+	var cred azcore.TokenCredential
+	var err error
 	ctx := context.Background()
 	secretValues := make(map[string]string)
 
@@ -55,12 +61,21 @@ func getAzureSecretsFromVaultByName(vaultName string) (map[string]string, error)
 	vaultURL := constructVaultURL(vaultName)
 	slog.Debug("Constructed vault URL", "vaultURL", vaultURL)
 
-	// Create credential using DefaultAzureCredential
-	slog.Debug("Creating Azure credential")
-	cred, err := azidentity.NewDefaultAzureCredential(nil)
-	if err != nil {
-		slog.Error("Failed to create Azure credential", "error", err)
-		return nil, fmt.Errorf("failed to create credential: %w", err)
+	if managedIdentityClientID != "" {
+		slog.Debug("Creating User Assigned Managed Identity credential with Client ID", "clientID", managedIdentityClientID)
+		cred, err = azidentity.NewManagedIdentityCredential(&azidentity.ManagedIdentityCredentialOptions{
+			ID: azidentity.ClientID(managedIdentityClientID),
+		})
+
+		if err != nil {
+			return nil, fmt.Errorf("failed to create User Assigned Managed Identity credential: %w", err)
+		}
+	} else {
+		slog.Debug("Creating DefaultAzureCredential")
+		cred, err = azidentity.NewDefaultAzureCredential(nil)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create credential: %w", err)
+		}
 	}
 
 	// Create the Key Vault secrets client

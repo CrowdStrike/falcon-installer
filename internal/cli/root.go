@@ -132,6 +132,7 @@ func rootCmd() *cobra.Command {
 	cspFlag.String("aws-secret-name", "", "AWS Secrets Manager Secret Name")
 	cspFlag.String("aws-secret-region", "", "AWS Secrets Manager Region")
 	cspFlag.String("azure-vault-name", "", "Azure Key Vault Name")
+	cspFlag.String("azure-managed-identity-client-id", "", "Azure User Assigned Managed Identity Client ID for Key Vault access")
 	cspFlag.String("gcp-project-id", "", "GCP Project ID for Secret Manager")
 	cspFlag.String("oci-compartment-id", "", "OCI Compartment ID")
 	cspFlag.String("oci-vault-name", "", "OCI Vault Name")
