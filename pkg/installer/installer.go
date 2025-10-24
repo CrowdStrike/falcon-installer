@@ -301,7 +301,7 @@ func (fi FalconInstaller) getBaseInstallerArgs() []string {
 		}
 
 		if fi.SensorConfig.NoStart {
-			args = append(args, "NoStart=1")
+			args = append(args, "NO_START=1")
 		}
 
 		if fi.SensorConfig.VDI {
