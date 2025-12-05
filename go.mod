@@ -10,7 +10,7 @@ require (
 	github.com/aws/aws-sdk-go-v2 v1.38.2
 	github.com/aws/aws-sdk-go-v2/config v1.31.4
 	github.com/aws/aws-sdk-go-v2/service/secretsmanager v1.39.1
-	github.com/crowdstrike/gofalcon v0.16.0
+	github.com/crowdstrike/gofalcon v0.18.0
 	github.com/oracle/oci-go-sdk/v65 v65.91.0
 	github.com/spf13/cobra v1.8.1
 	github.com/spf13/pflag v1.0.5

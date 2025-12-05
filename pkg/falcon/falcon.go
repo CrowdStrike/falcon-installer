@@ -42,6 +42,13 @@ import (
 
 var enterpriseLinux = []string{"rhel", "centos", "oracle", "ol", "oraclelinux", "almalinux", "rocky"}
 
+// isPermissionDeniedError checks if the error payload contains a 403 permission denied error.
+func isPermissionDeniedError(errPayload []byte) bool {
+	errStr := string(errPayload)
+	return strings.Contains(errStr, "\"code\":403,\"message\":\"access denied, authorization failed\"") ||
+		strings.Contains(errStr, "\"code\":403,\"message\":\"access denied, scope not permitted\"")
+}
+
 // GetCID gets the Falcon CID from the CrowdStrike API using the SensorDownload API.
 func GetCID(ctx context.Context, client *client.CrowdStrikeAPISpecification) (string, error) {
 	response, err := client.SensorDownload.GetSensorInstallersCCIDByQuery(&sensor_download.GetSensorInstallersCCIDByQueryParams{
@@ -85,7 +92,7 @@ func GetMaintenanceToken(client *client.CrowdStrikeAPISpecification, aid string)
 			log.Fatal(mErr)
 		}
 
-		if strings.Contains(string(bytes), "\"code\":403,\"message\":\"access denied, authorization failed\"") {
+		if isPermissionDeniedError(bytes) {
 			slog.Warn("Skipping getting maintenance token because the OAuth scope does not have permission to read maintenance tokens. Please provide the token via CLI or update the OAuth2 client with the `Sensor Update Policies: Write` scope.")
 			return ""
 		} else {
@@ -158,7 +165,7 @@ func GetProvisioningToken(client *client.CrowdStrikeAPISpecification) string {
 			log.Fatal(mErr)
 		}
 
-		if strings.Contains(string(bytes), "\"code\":403,\"message\":\"access denied, authorization failed\"") {
+		if isPermissionDeniedError(bytes) {
 			slog.Warn("Skipping getting installation tokens because the OAuth scope does not have permission to read installation tokens. If you are using provisioning tokens, please provide the token via CLI or update the OAuth2 client with the `Installation Tokens: Read` scope.")
 			return ""
 		} else {
@@ -220,7 +227,7 @@ func GetSensorUpdatePolicies(client *client.CrowdStrikeAPISpecification, osType 
 			log.Fatal(mErr)
 		}
 
-		if strings.Contains(string(bytes), "\"code\":403,\"message\":\"access denied, authorization failed\"") {
+		if isPermissionDeniedError(bytes) {
 			slog.Warn("Skipping getting sensor version from sensor update policies because the OAuth scope does not have permission to read sensor update policies. If you are using sensor update policies, please provide the token via CLI or update the OAuth2 client with the `Sensor update policies: Read` scope.")
 			return ""
 		} else {
