@@ -43,13 +43,12 @@ import (
 
 var enterpriseLinux = []string{"rhel", "centos", "oracle", "ol", "oraclelinux", "almalinux", "rocky"}
 
-// semverRegex matches semantic version patterns like "7.32.20403".
-var semverRegex = regexp.MustCompile(`^\d+\.\d+\.\d+`)
-
 // extractSemver extracts the semantic version from a version string,
 // removing any suffixes like " (LTS)" or other trailing content.
 // The sensor download API only accepts clean version numbers in FQL queries.
 func extractSemver(version string) string {
+	// semverRegex matches semantic version patterns like "7.32.20403".
+	semverRegex := regexp.MustCompile(`^\d+\.\d+\.\d+`)
 	match := semverRegex.FindString(version)
 	if match != "" {
 		return match
