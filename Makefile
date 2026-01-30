@@ -79,7 +79,7 @@ GOLANGCI_LINT = $(LOCALBIN)/golangci-lint
 ADDLICENSE = $(LOCALBIN)/addlicense
 
 ## Tool Versions
-GOLANGCI_LINT_VERSION ?= v2.0.2
+GOLANGCI_LINT_VERSION ?= v2.8.0
 ADDLICENSE_VERSION ?= latest
 
 .PHONY: golangci-lint
