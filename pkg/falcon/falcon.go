@@ -28,6 +28,7 @@ import (
 	"log"
 	"log/slog"
 	"os"
+	"regexp"
 	"slices"
 	"strings"
 
@@ -41,6 +42,19 @@ import (
 )
 
 var enterpriseLinux = []string{"rhel", "centos", "oracle", "ol", "oraclelinux", "almalinux", "rocky"}
+
+// extractSemver extracts the semantic version from a version string,
+// removing any suffixes like " (LTS)" or other trailing content.
+// The sensor download API only accepts clean version numbers in FQL queries.
+func extractSemver(version string) string {
+	// semverRegex matches semantic version patterns like "7.32.20403".
+	semverRegex := regexp.MustCompile(`^\d+\.\d+\.\d+`)
+	match := semverRegex.FindString(version)
+	if match != "" {
+		return match
+	}
+	return version
+}
 
 // isPermissionDeniedError checks if the error payload contains a 403 permission denied error.
 func isPermissionDeniedError(errPayload []byte) bool {
@@ -293,7 +307,8 @@ func GetSensors(client *client.CrowdStrikeAPISpecification, osName string, osVer
 
 		f := fmt.Sprintf("os:~\"%s\"+os_version:\"%s\"+architectures:\"%s\"", osName, osVersionFilter, arch)
 		if sensorVersion != "" {
-			f = fmt.Sprintf("%s+version:\"%s\"", f, sensorVersion)
+			sanitizedVersion := extractSemver(sensorVersion)
+			f = fmt.Sprintf("%s+version:\"%s\"", f, sanitizedVersion)
 		}
 		slog.Debug("Sensor Installer Query", slog.String("Filter", f))
 		filter = &f
