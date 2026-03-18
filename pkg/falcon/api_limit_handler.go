@@ -100,6 +100,7 @@ func (d *FalconAPIRateLimitDecorator) RoundTrip(req *http.Request) (*http.Respon
 				return nil, err
 			}
 			// For other errors, retry
+			slog.Error("Request failed, retrying", "method", req.Method, "url", req.URL.String(), "attempt", attempt, "error", err) //nolint:gosec // G706 - structured logging safely handles tainted values
 			continue
 		}
 
@@ -115,7 +116,7 @@ func (d *FalconAPIRateLimitDecorator) RoundTrip(req *http.Request) (*http.Respon
 				}
 			}
 
-			slog.Info(fmt.Sprintf("Rate limit exceeded. Retrying after %s", time.Until(d.retryAfter)))
+			slog.Info(fmt.Sprintf("Rate limit exceeded. Retrying after %s", time.Until(d.retryAfter))) //nolint:gosec // G706 - value is parsed and validated
 			continue
 		}
 
