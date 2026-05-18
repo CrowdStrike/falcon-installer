@@ -27,7 +27,6 @@ import (
 	"fmt"
 	"log"
 	"log/slog"
-	"net/http"
 	"os"
 	"os/exec"
 	"strings"
@@ -117,6 +116,8 @@ type FalconInstaller struct {
 	UserAgent string
 	// ConfigureImage will configure the sensor on the image. Linux only.
 	ConfigureImage bool
+	// MaxRetries is the maximum number of retries for API requests. Defaults to 10 if unset.
+	MaxRetries uint
 
 	// SensorConfig is the configuration for the Falcon sensor CLI args.
 	SensorConfig FalconSensorCLI
@@ -138,8 +139,8 @@ func Run(fc FalconInstaller) {
 		Cloud:             gofalcon.Cloud(fc.Cloud),
 		Context:           context.Background(),
 		UserAgentOverride: fc.UserAgent,
-		TransportDecorator: func(t http.RoundTripper) http.RoundTripper {
-			return falcon.NewFalconAPIRateLimitDecorator(t)
+		RetryConfig: &gofalcon.RetryConfig{
+			MaxTries: fc.MaxRetries,
 		},
 	})
 	if err != nil {

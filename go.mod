@@ -10,7 +10,7 @@ require (
 	github.com/aws/aws-sdk-go-v2 v1.38.2
 	github.com/aws/aws-sdk-go-v2/config v1.31.4
 	github.com/aws/aws-sdk-go-v2/service/secretsmanager v1.39.1
-	github.com/crowdstrike/gofalcon v0.18.0
+	github.com/crowdstrike/gofalcon v0.20.2-0.20260518213155-0103e477de33
 	github.com/oracle/oci-go-sdk/v65 v65.91.0
 	github.com/spf13/cobra v1.8.1
 	github.com/spf13/pflag v1.0.5
@@ -41,6 +41,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/sts v1.38.1 // indirect
 	github.com/aws/smithy-go v1.23.0 // indirect
 	github.com/blang/semver/v4 v4.0.0 // indirect
+	github.com/cenkalti/backoff/v5 v5.0.3 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/fsnotify/fsnotify v1.7.0 // indirect

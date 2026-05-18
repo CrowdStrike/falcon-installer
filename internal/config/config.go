@@ -78,6 +78,7 @@ func Load() (*Config, error) {
 	c.TmpDir = viper.GetString("tmpdir")
 	c.UserAgent = viper.GetString("user_agent")
 	c.ConfigureImage = viper.GetBool("configure_image")
+	c.MaxRetries = viper.GetUint("max_retries")
 
 	c.SensorConfig.CID = viper.GetString("cid")
 	c.SensorConfig.Tags = viper.GetString("tags")
