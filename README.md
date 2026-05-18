@@ -38,7 +38,7 @@ Falcon API Flags:
       --access-token string           Access token for accessing CrowdStrike Falcon Platform
       --client-id string              Client ID for accessing CrowdStrike Falcon Platform
       --client-secret string          Client Secret for accessing CrowdStrike Falcon Platform
-      --cloud string                  Falcon cloud abbreviation (e.g. us-1, us-2, eu-1, us-gov-1) (default "autodiscover")
+      --cloud string                  Falcon cloud abbreviation (e.g. us-1, us-2, eu-1, us-gov-1, us-gov-2) (default "autodiscover")
       --member-cid string             Member CID for MSSP (for cases when OAuth2 authenticates multiple CIDs)
       --sensor-update-policy string   The sensor update policy name to use for sensor installation (default "platform_default")
       --sensor-version string         The sensor version to update or install (overrides sensor-update-policy)
@@ -51,6 +51,7 @@ Falcon Sensor Flags:
       --provisioning-token string   The provisioning token to use for installing the sensor. If not provided, the API will attempt to retrieve a token
       --proxy-host string           The proxy host for the sensor to use when communicating with CrowdStrike
       --proxy-port string           The proxy port for the sensor to use when communicating with CrowdStrike
+      --sensor-cloud string         Set the CrowdStrike cloud the sensor connects to if necessary (e.g. us-1, us-2, eu-1, us-gov-1, us-gov-2)
       --tags string                 A comma separated list of tags for sensor grouping
 
 Falcon Uninstall Flags:

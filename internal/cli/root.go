@@ -175,6 +175,7 @@ func rootCmd() *cobra.Command {
 		"The provisioning token to use for installing the sensor. If not provided, the API will attempt to retrieve a token")
 	falconFlag.String("tags", "", "A comma separated list of tags for sensor grouping")
 	falconFlag.String("maintenance-token", "", "Maintenance token for uninstalling the sensor or configuring sensor settings")
+	falconFlag.String("sensor-cloud", "", "The CrowdStrike cloud the sensor connects to (e.g. us-1, us-2, eu-1, us-gov-1, us-gov-2)")
 
 	if targetOS != "macos" {
 		falconFlag.Bool("disable-proxy", false, "Disable the sensor proxy settings")
@@ -410,8 +411,12 @@ func preRunValidation(cmd *cobra.Command) error {
 		return fmt.Errorf("invalid member CID format: %v", err)
 	}
 
-	if err := inputValidation(viper.GetString("cloud"), "^(autodiscover|us-1|us-2|eu-1|us-gov-1|gov1)$"); err != nil {
+	if err := inputValidation(viper.GetString("cloud"), "^(autodiscover|us-?1|us-?2|eu-?1|us-?gov-?1|us-?gov-?2|gov-?1|gov-?2)$"); err != nil {
 		return fmt.Errorf("invalid cloud region: %v", err)
+	}
+
+	if err := inputValidation(viper.GetString("sensor_cloud"), "^(us-?1|us-?2|eu-?1|us-?gov-?1|us-?gov-?2|gov-?1|gov-?2)$"); err != nil {
+		return fmt.Errorf("invalid sensor cloud region: %v", err)
 	}
 
 	if err := inputValidation(viper.GetString("tags"), "^[a-zA-Z0-9,_/-]+$"); err != nil {
@@ -465,7 +470,7 @@ func Run(_ *cobra.Command, _ []string) {
 		installer.Update(cfg.FalconInstaller)
 	default:
 		slog.Debug("Falcon sensor CLI options", "CID", cfg.SensorConfig.CID, "ProvisioningToken", cfg.SensorConfig.ProvisioningToken,
-			"Tags", cfg.SensorConfig.Tags, "DisableProxy", cfg.SensorConfig.ProxyDisable, "ProxyHost", cfg.SensorConfig.ProxyHost,
+			"Tags", cfg.SensorConfig.Tags, "SensorCloud", cfg.SensorConfig.Cloud, "DisableProxy", cfg.SensorConfig.ProxyDisable, "ProxyHost", cfg.SensorConfig.ProxyHost,
 			"ProxyPort", cfg.SensorConfig.ProxyPort)
 		slog.Debug("Falcon installer options", "Cloud", cfg.Cloud, "MemberCID", cfg.MemberCID, "SensorUpdatePolicyName", cfg.SensorUpdatePolicyName,
 			"GpgKeyFile", cfg.GpgKeyFile, "TmpDir", cfg.TmpDir, "OsName", cfg.OsName, "OsVersion", cfg.OsVersion, "OS", cfg.OSType, "Arch", cfg.Arch)

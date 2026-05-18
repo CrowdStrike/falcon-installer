@@ -92,6 +92,7 @@ func Load() (*Config, error) {
 	c.SensorConfig.DisableProvisioningWait = viper.GetBool("disable_provisioning_wait")
 	c.SensorConfig.ProvisioningWaitTime = viper.GetUint64("provisioning_wait_time")
 	c.SensorConfig.VDI = viper.GetBool("vdi")
+	c.SensorConfig.Cloud = viper.GetString("sensor_cloud")
 
 	// Implementation to load configuration
 	return c, nil
