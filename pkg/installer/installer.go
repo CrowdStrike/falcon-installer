@@ -47,6 +47,7 @@ var (
 		"cid":                "CID",
 		"provisioning-token": "ProvToken",
 		"tags":               "GROUPING_TAGS",
+		"cloud":              "CLOUD_NAME",
 		"apd":                "PROXYDISABLE",
 		"aph":                "APP_PROXYNAME",
 		"app":                "APP_PROXYPORT",
@@ -65,6 +66,8 @@ type FalconSensorCLI struct {
 	ProxyPort string
 	// Tags is a comma separated list of tags for sensor grouping.
 	Tags string
+	// Cloud is the CrowdStrike cloud the sensor should connect to (e.g., us-1, us-2, eu-1, us-gov-1, us-gov-2).
+	Cloud string
 	// MaintenanceToken is the token used to perform maintenance on the sensor when Tamper Protection is enabled.
 	MaintenanceToken string
 	// ProvisioningToken is the token used to provision the sensor. If not provided, the API will attempt to retrieve a token.
@@ -335,6 +338,11 @@ func (fi FalconInstaller) addCommonConfigArgs(args []string) []string {
 		args = append(args, fi.formatArg("tags", fi.SensorConfig.Tags))
 	}
 
+	// Add cloud if provided
+	if fi.SensorConfig.Cloud != "" {
+		args = append(args, fi.formatArg("cloud", fi.SensorConfig.Cloud))
+	}
+
 	return args
 }
 
@@ -392,6 +400,9 @@ func (fi FalconInstaller) buildMacOSArgs(command string) []string {
 		args = []string{"license", fi.SensorConfig.CID}
 		if fi.SensorConfig.ProvisioningToken != "" {
 			args = append(args, fi.SensorConfig.ProvisioningToken)
+		}
+		if fi.SensorConfig.Cloud != "" {
+			args = append(args, "--cloud", fi.SensorConfig.Cloud)
 		}
 	case "grouping-tags":
 		args = []string{"grouping-tags", "set", fi.SensorConfig.Tags}
