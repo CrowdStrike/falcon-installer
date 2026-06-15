@@ -30,7 +30,7 @@ import (
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
-	"github.com/Azure/azure-sdk-for-go/sdk/keyvault/azsecrets"
+	"github.com/Azure/azure-sdk-for-go/sdk/security/keyvault/azsecrets"
 )
 
 // GetAzureKeyVaultSecrets retrieves secrets from an Azure Key Vault.
@@ -88,7 +88,7 @@ func getAzureSecretsFromVaultByName(vaultName, managedIdentityClientID string) (
 
 	// List all secret properties using pager
 	slog.Debug("Listing secrets in vault", "vaultURL", vaultURL)
-	pager := client.NewListSecretsPager(nil)
+	pager := client.NewListSecretPropertiesPager(nil)
 	secretCount := 0
 
 	for pager.More() {

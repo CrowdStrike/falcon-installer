@@ -63,7 +63,7 @@ func Update(fc FalconInstaller) {
 		ClientId:          fc.ClientID,
 		ClientSecret:      fc.ClientSecret,
 		AccessToken:       fc.AccessToken,
-		MemberCID:         fc.MemberCID,
+		MemberCID:         normalizeMemberCID(fc.MemberCID),
 		Cloud:             gofalcon.Cloud(fc.Cloud),
 		Context:           context.Background(),
 		UserAgentOverride: fc.UserAgent,

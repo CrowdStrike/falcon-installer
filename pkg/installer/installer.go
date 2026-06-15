@@ -137,7 +137,7 @@ func Run(fc FalconInstaller) {
 		ClientId:          fc.ClientID,
 		ClientSecret:      fc.ClientSecret,
 		AccessToken:       fc.AccessToken,
-		MemberCID:         fc.MemberCID,
+		MemberCID:         normalizeMemberCID(fc.MemberCID),
 		Cloud:             gofalcon.Cloud(fc.Cloud),
 		Context:           context.Background(),
 		UserAgentOverride: fc.UserAgent,
@@ -380,6 +380,16 @@ func (fi FalconInstaller) formatArg(arg, val string) string {
 	default:
 		return fmt.Sprintf("--%s=%s", arg, val)
 	}
+}
+
+// normalizeMemberCID returns the member CID without its checksum suffix.
+//
+// The sensor CID is formatted as "<32 hex>-<2 hex checksum>", but the OAuth2
+// member_cid endpoint parameter expects the bare 32-character CID. Users may
+// supply either form, so strip the optional "-XX" checksum before it reaches
+// the API.
+func normalizeMemberCID(cid string) string {
+	return strings.SplitN(cid, "-", 2)[0]
 }
 
 // buildMacOSArgs builds arguments for macOS-specific commands.

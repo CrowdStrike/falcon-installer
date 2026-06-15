@@ -407,7 +407,9 @@ func preRunValidation(cmd *cobra.Command) error {
 		return fmt.Errorf("invalid CID format: %v", err)
 	}
 
-	if err := inputValidation(viper.GetString("member_cid"), "^[0-9a-fA-F]{32}-[0-9a-fA-F]{2}$"); err != nil {
+	// The member CID may be supplied with or without its "-XX" checksum suffix;
+	// the OAuth2 member_cid endpoint param uses the bare 32-character CID.
+	if err := inputValidation(viper.GetString("member_cid"), "^[0-9a-fA-F]{32}(-[0-9a-fA-F]{2})?$"); err != nil {
 		return fmt.Errorf("invalid member CID format: %v", err)
 	}
 
