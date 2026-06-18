@@ -27,7 +27,6 @@ import (
 	"fmt"
 	"log"
 	"log/slog"
-	"net/http"
 	"os/exec"
 
 	"github.com/crowdstrike/falcon-installer/pkg/falcon"
@@ -56,8 +55,8 @@ func Uninstall(fc FalconInstaller) {
 				Cloud:             gofalcon.Cloud(fc.Cloud),
 				Context:           context.Background(),
 				UserAgentOverride: fc.UserAgent,
-				TransportDecorator: func(t http.RoundTripper) http.RoundTripper {
-					return falcon.NewFalconAPIRateLimitDecorator(t)
+				RetryConfig: &gofalcon.RetryConfig{
+					MaxTries: fc.MaxRetries,
 				},
 			})
 			if err != nil {
