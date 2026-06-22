@@ -425,11 +425,11 @@ func preRunValidation(cmd *cobra.Command) error {
 		return fmt.Errorf("invalid member CID format: %v", err)
 	}
 
-	if err := inputValidation(viper.GetString("cloud"), "^(autodiscover|us-?1|us-?2|eu-?1|us-?gov-?1|us-?gov-?2|gov-?1|gov-?2)$"); err != nil {
+	if err := inputValidation(viper.GetString("cloud"), "^(autodiscover|us-?1|us-?2|us-?3|eu-?1|us-?gov-?1|us-?gov-?2|gov-?1|gov-?2)$"); err != nil {
 		return fmt.Errorf("invalid cloud region: %v", err)
 	}
 
-	if err := inputValidation(viper.GetString("sensor_cloud"), "^(us-?1|us-?2|eu-?1|us-?gov-?1|us-?gov-?2|gov-?1|gov-?2)$"); err != nil {
+	if err := inputValidation(viper.GetString("sensor_cloud"), "^(us-?1|us-?2|us-?3|eu-?1|us-?gov-?1|us-?gov-?2|gov-?1|gov-?2)$"); err != nil {
 		return fmt.Errorf("invalid sensor cloud region: %v", err)
 	}
 
