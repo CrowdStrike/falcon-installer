@@ -26,9 +26,11 @@
 package osutils
 
 import (
+	"os"
 	"runtime"
 	"strconv"
 	"strings"
+	"syscall"
 	"testing"
 )
 
@@ -224,4 +226,79 @@ func TestScQuery(t *testing.T) {
 	if sc {
 		t.Errorf("Expected false result on non-Windows platform, got: %v", sc)
 	}
+}
+
+// TestPermsCreatesDir verifies the directory is created with 0700 permissions. The
+// chown to root only succeeds when running as root, so a non-root run still creates and chmods
+// the directory before returning the expected ownership error.
+func TestPermsCreatesDir(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir() + "/falcon"
+	err := EnsureDirPerms(dir)
+	if os.Getuid() == 0 && err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	info, err := os.Stat(dir)
+	if err != nil {
+		t.Fatalf("directory not created: %v", err)
+	}
+	if !info.IsDir() {
+		t.Errorf("expected a directory")
+	}
+	if perm := info.Mode().Perm(); perm != 0700 {
+		t.Errorf("expected permissions 0700, got %o", perm)
+	}
+}
+
+// TestEnsureDirPermissions verifies a too-permissive existing directory is corrected to 0700.
+func TestEnsureDirPermissions(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir() + "/loose"
+	if err := os.Mkdir(dir, 0777); err != nil {
+		t.Fatalf("failed to seed directory: %v", err)
+	}
+	// Defeat umask so the seeded perms are actually loose.
+	if err := os.Chmod(dir, 0777); err != nil {
+		t.Fatalf("failed to chmod seed directory: %v", err)
+	}
+
+	// chown to root only succeeds when running as root; the perm check below is what matters here.
+	err := EnsureDirPerms(dir)
+	if os.Getuid() != 0 {
+		// Non-root cannot chown to root, so EnsureDirPerms returns an error after chmod succeeds.
+		// Verify the chmod still took effect.
+		if perm := mustPerm(t, dir); perm != 0700 {
+			t.Errorf("expected permissions 0700, got %o", perm)
+		}
+		return
+	}
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	if perm := mustPerm(t, dir); perm != 0700 {
+		t.Errorf("expected permissions 0700, got %o", perm)
+	}
+
+	info, err := os.Stat(dir)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	if stat, ok := info.Sys().(*syscall.Stat_t); ok {
+		if stat.Uid != 0 {
+			t.Errorf("expected owner uid 0, got %d", stat.Uid)
+		}
+	}
+}
+
+func mustPerm(t *testing.T, dir string) os.FileMode {
+	t.Helper()
+	info, err := os.Stat(dir)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	return info.Mode().Perm()
 }

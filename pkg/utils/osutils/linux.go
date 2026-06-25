@@ -82,6 +82,23 @@ func InstalledFalconVersion(targetOS string) (string, error) {
 	}
 }
 
+// EnsureDirPerms creates dir (and parents) if needed and forces it to be owned by root with 0700 permissions.
+func EnsureDirPerms(dir string) error {
+	if err := os.MkdirAll(dir, 0700); err != nil {
+		return fmt.Errorf("failed to create directory %s: %w", dir, err)
+	}
+
+	if err := os.Chmod(dir, 0700); err != nil {
+		return fmt.Errorf("failed to set permissions on directory %s: %w", dir, err)
+	}
+
+	if err := os.Chown(dir, 0, 0); err != nil {
+		return fmt.Errorf("failed to set ownership on directory %s: %w", dir, err)
+	}
+
+	return nil
+}
+
 // scQuery always returns false for non-Windows operating systems and is used as a placeholder for Windows-specific functionality.
 func scQuery(_ string) (bool, error) {
 	// This is a non-Windows implementation that always returns false

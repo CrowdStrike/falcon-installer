@@ -376,6 +376,14 @@ func SensorDownload(client *client.CrowdStrikeAPISpecification, sensor *models.D
 	}
 
 	fullPath := fmt.Sprintf("%s%s%s", dir, string(os.PathSeparator), filename)
+
+	// Verify the download against the SHA256 the API used to identify it. On mismatch we abort;
+	// the partial/corrupt file is left in place and removed by OpenFileForWriting on the next run.
+	if err := utils.VerifyFileHash(fullPath, *sensor.Sha256); err != nil {
+		log.Fatalf("Failed to verify downloaded sensor: %v", err)
+	}
+	slog.Debug("Verified sensor checksum", "sha256", *sensor.Sha256, "path", fullPath)
+
 	slog.Debug(fmt.Sprintf("Downloaded %s to %s", *sensor.Description, fullPath))
 	return fullPath
 }

@@ -24,6 +24,8 @@ package utils
 
 import (
 	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"os"
@@ -133,5 +135,68 @@ func OpenFileForWriting(dir, filename string) (*os.File, error) {
 		return nil, fmt.Errorf("failed to create directory: %w", err)
 	}
 
-	return os.OpenFile(safeLocation, os.O_CREATE|os.O_WRONLY, 0600)
+	// Remove any pre-existing file or symlink at the destination filename
+	if err := os.Remove(safeLocation); err != nil && !os.IsNotExist(err) {
+		return nil, fmt.Errorf("failed to remove existing file %s: %w", safeLocation, err)
+	}
+
+	return os.OpenFile(safeLocation, os.O_CREATE|os.O_WRONLY|os.O_EXCL, 0600)
+}
+
+// VerifyFileHash computes the SHA256 of the file at path and compares it to expected (a hex-encoded
+// digest). The comparison is case-insensitive. It returns an error if the file cannot be read or if
+// the computed digest does not match expected.
+func VerifyFileHash(path, expected string) error {
+	file, err := os.Open(path)
+	if err != nil {
+		return fmt.Errorf("failed to open %s for verification: %w", path, err)
+	}
+	defer file.Close()
+
+	hash := sha256.New()
+	if _, err := io.Copy(hash, file); err != nil {
+		return fmt.Errorf("failed to read %s for verification: %w", path, err)
+	}
+
+	actual := hex.EncodeToString(hash.Sum(nil))
+	if !strings.EqualFold(actual, expected) {
+		return fmt.Errorf("checksum mismatch for %s: expected %s, got %s", path, expected, actual)
+	}
+
+	return nil
+}
+
+// sensitiveArgPrefixes are the command-line argument forms whose value is a secret token. Linux
+// falconctl uses "--<name>=VALUE"; the Windows installer uses "/maintenance_token=VALUE" and
+// "ProvToken=VALUE".
+var sensitiveArgPrefixes = []string{
+	"--maintenance-token=",
+	"/maintenance_token=",
+	"--provisioning-token=",
+	"ProvToken=",
+}
+
+// RedactSecret replaces a non-empty value with "[REDACTED]" so a secret can be safely logged. An
+// empty value is returned unchanged so an unset field is not misreported as a secret.
+func RedactSecret(value string) string {
+	if value == "" {
+		return ""
+	}
+	return "[REDACTED]"
+}
+
+// RedactArgs returns a copy of args with any sensitive token value replaced via RedactSecret so the
+// arguments can be safely logged. Arguments that do not carry a token are returned unchanged.
+func RedactArgs(args []string) []string {
+	redacted := make([]string, len(args))
+	for i, arg := range args {
+		redacted[i] = arg
+		for _, prefix := range sensitiveArgPrefixes {
+			if strings.HasPrefix(arg, prefix) {
+				redacted[i] = prefix + RedactSecret(arg[len(prefix):])
+				break
+			}
+		}
+	}
+	return redacted
 }

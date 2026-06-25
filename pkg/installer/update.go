@@ -205,10 +205,12 @@ func (fc FalconInstaller) updateLinuxSensor(path string, maintenanceToken string
 // updateWindowsSensor updates the Falcon sensor on Windows systems.
 func (fi FalconInstaller) updateWindowsSensor(path string, maintenanceToken string) error {
 	args := []string{"/silent", "/upgrade"}
+	slog.Debug("Updating Falcon sensor on Windows", "installer", path, "args", args)
+
+	// Append the maintenance token after the Debug log so the token is not logged.
 	if maintenanceToken != "" {
 		args = append(args, fmt.Sprintf("/maintenance_token=%s", maintenanceToken))
 	}
-	slog.Debug("Updating Falcon sensor on Windows", "installer", path, "args", args)
 
 	stdout, stderr, err := utils.RunCmd(path, args)
 	if err != nil {

@@ -85,7 +85,7 @@ func (s *SensorConfig) Set(args []string, options ...SensorOption) error {
 
 // Get retrieves the Falcon sensor settings using the OS-specific command.
 func (s *SensorConfig) Get(args []string) (string, error) {
-	slog.Debug("Getting sensor settings", "command", s.path, "args", args)
+	slog.Debug("Getting sensor settings", "command", s.path, "args", utils.RedactArgs(args))
 
 	if err := s.validatePath(); err != nil {
 		return "", err
@@ -101,7 +101,7 @@ func (s *SensorConfig) Get(args []string) (string, error) {
 
 // configure sets up the Falcon sensor using the OS-specific command.
 func (s *SensorConfig) configure(args []string, maintenanceToken *string) error {
-	slog.Debug("Configuring Falcon sensor", "command", s.path, "args", args)
+	slog.Debug("Configuring Falcon sensor", "command", s.path, "args", utils.RedactArgs(args))
 
 	if err := s.validatePath(); err != nil {
 		return err
