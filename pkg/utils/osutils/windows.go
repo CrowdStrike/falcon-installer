@@ -30,6 +30,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"os"
 	"strings"
 	"syscall"
 	"unsafe"
@@ -110,6 +111,15 @@ func InstalledFalconVersion(targetOS string) (string, error) {
 
 	// If we've checked all subkeys and didn't find CrowdStrike Falcon
 	return "", fmt.Errorf("CrowdStrike Falcon version not found in registry")
+}
+
+// EnsureDirPerms creates dir (and parents) if needed.
+func EnsureDirPerms(dir string) error {
+	if err := os.MkdirAll(dir, 0700); err != nil {
+		return fmt.Errorf("failed to create directory %s: %w", dir, err)
+	}
+
+	return nil
 }
 
 // scQuery queries the Windows service manager for the presence of a service.

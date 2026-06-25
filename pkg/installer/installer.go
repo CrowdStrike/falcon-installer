@@ -482,7 +482,7 @@ func (fi FalconInstaller) installLinuxSensor(path string) error {
 // installWindowsSensor installs the Falcon sensor on Windows systems.
 func (fi FalconInstaller) installWindowsSensor(path string) error {
 	falconArgs := fi.buildInstallerArgs()
-	slog.Debug("Installing Falcon sensor on Windows", "installer", path, "args", falconArgs)
+	slog.Debug("Installing Falcon sensor on Windows", "installer", path, "args", utils.RedactArgs(falconArgs))
 
 	stdout, stderr, err := utils.RunCmd(path, falconArgs)
 	if err != nil {

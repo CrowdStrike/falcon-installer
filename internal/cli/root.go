@@ -38,6 +38,7 @@ import (
 	"github.com/crowdstrike/falcon-installer/internal/config"
 	"github.com/crowdstrike/falcon-installer/internal/version"
 	"github.com/crowdstrike/falcon-installer/pkg/installer"
+	"github.com/crowdstrike/falcon-installer/pkg/utils"
 	"github.com/crowdstrike/falcon-installer/pkg/utils/osutils"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -319,10 +320,21 @@ func preRunConfig(cmd *cobra.Command, _ []string) {
 	enableFileLogging := viper.GetBool("enable_file_logging")
 	tmpdir := viper.GetString("tmpdir")
 
-	if _, err := os.Stat(tmpdir); os.IsNotExist(err) {
-		if err := os.MkdirAll(tmpdir, 0700); err != nil {
-			log.Fatalf("Error creating temporary directory: %v", err)
+	// If the default temporary directory already exists as a symlink, nest the working directory
+	// one level deeper (e.g. /tmp/falcon/falcon) so downloads land in a directory we create and
+	// own rather than writing directly through the symlink. This only applies to the default
+	// directory; a user-supplied --tmpdir is used as provided.
+	if tmpdir == defaultTmpDir {
+		if info, err := os.Lstat(tmpdir); err == nil && info.Mode()&os.ModeSymlink != 0 {
+			tmpdir = fmt.Sprintf("%s%s%s", tmpdir, string(os.PathSeparator), "falcon")
+			viper.Set("tmpdir", tmpdir)
 		}
+	}
+
+	// Create and secure the temporary directory (owned by root, 0700 on Unix). This runs even
+	// when the directory already exists so its ownership and permissions are corrected.
+	if err := osutils.EnsureDirPerms(tmpdir); err != nil {
+		log.Fatalf("Error setting temporary directory permissions: %v", err)
 	}
 
 	if tmpdir != defaultTmpDir {
@@ -471,7 +483,7 @@ func Run(_ *cobra.Command, _ []string) {
 	case viper.GetBool("update"), viper.GetBool("upgrade"):
 		installer.Update(cfg.FalconInstaller)
 	default:
-		slog.Debug("Falcon sensor CLI options", "CID", cfg.SensorConfig.CID, "ProvisioningToken", cfg.SensorConfig.ProvisioningToken,
+		slog.Debug("Falcon sensor CLI options", "CID", cfg.SensorConfig.CID, "ProvisioningToken", utils.RedactSecret(cfg.SensorConfig.ProvisioningToken),
 			"Tags", cfg.SensorConfig.Tags, "SensorCloud", cfg.SensorConfig.Cloud, "DisableProxy", cfg.SensorConfig.ProxyDisable, "ProxyHost", cfg.SensorConfig.ProxyHost,
 			"ProxyPort", cfg.SensorConfig.ProxyPort)
 		slog.Debug("Falcon installer options", "Cloud", cfg.Cloud, "MemberCID", cfg.MemberCID, "SensorUpdatePolicyName", cfg.SensorUpdatePolicyName,
