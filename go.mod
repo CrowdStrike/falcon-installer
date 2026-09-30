@@ -1,6 +1,6 @@
 module github.com/crowdstrike/falcon-installer
 
-go 1.26.4
+go 1.27.1
 
 require (
 	cloud.google.com/go/secretmanager v1.20.0
