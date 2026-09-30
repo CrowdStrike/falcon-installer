@@ -98,6 +98,67 @@ Windows Installation Flags:
 
 ## Installation
 
+### Quick install
+
+The install scripts download a release from GitHub, verify its SHA-256 checksum against the release's `checksums.txt`, and save the binary in the current directory. They download into a temporary directory that they remove afterwards, and they do not run the binary.
+
+#### Linux and macOS
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/CrowdStrike/falcon-installer/main/scripts/install.sh | sh
+sudo ./falcon-installer --help
+```
+
+To pin a version, which is recommended when installing across many hosts:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/CrowdStrike/falcon-installer/main/scripts/install.sh | sh -s -- --version v0.27.0
+```
+
+| Option | Environment variable | Description |
+|---|---|---|
+| `-v`, `--version <tag>` | `FALCON_INSTALLER_VERSION` | Release to install (default: latest) |
+| `-d`, `--install-dir <dir>` | `FALCON_INSTALLER_DIR` | Directory to save the binary in (default: current directory) |
+| `--no-sudo` | `FALCON_INSTALLER_USE_SUDO=false` | Never use `sudo`, even if the directory is not writable |
+| `--force` | | Reinstall even if the version is already installed |
+| `--debug` | `FALCON_INSTALLER_DEBUG=true` | Print each command as it runs |
+
+#### Windows
+
+In PowerShell:
+
+```powershell
+irm https://raw.githubusercontent.com/CrowdStrike/falcon-installer/main/scripts/install.ps1 | iex
+```
+
+Then run `.\falcon-installer.exe` from an elevated PowerShell. To pass options:
+
+```powershell
+& ([scriptblock]::Create((irm https://raw.githubusercontent.com/CrowdStrike/falcon-installer/main/scripts/install.ps1))) -Version v0.27.0
+```
+
+| Parameter | Environment variable | Description |
+|---|---|---|
+| `-Version <tag>` | `FALCON_INSTALLER_VERSION` | Release to install (default: latest) |
+| `-InstallDir <dir>` | `FALCON_INSTALLER_DIR` | Directory to save the binary in (default: current directory) |
+| `-Force` | | Reinstall even if the version is already installed |
+
+#### Reviewing the script first
+
+To read a script before running it, download it, then run it locally:
+
+```bash
+curl -fsSLO https://raw.githubusercontent.com/CrowdStrike/falcon-installer/main/scripts/install.sh
+sh install.sh --help
+```
+
+```powershell
+irm https://raw.githubusercontent.com/CrowdStrike/falcon-installer/main/scripts/install.ps1 -OutFile install.ps1
+Get-Help .\install.ps1 -Full
+```
+
+### Manual install
+
 - Download a binary release for your targeted operating system of the Falcon Installer from [the official releases page](https://github.com/CrowdStrike/falcon-installer/releases).
 - Extract the archive `tar -xvzf <linux-archive>.tar.gz` for Linux and `tar -xf <windows-archive>.zip` for Windows.
 - Run the installer setting the CLI flags or environment variables as necessary.
