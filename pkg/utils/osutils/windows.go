@@ -30,6 +30,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"math"
 	"os"
 	"strings"
 	"syscall"
@@ -46,15 +47,15 @@ const (
 	X509_ASN_ENCODING     = 0x00000001
 	PKCS_7_ASN_ENCODING   = 0x00010000
 
-	// Certificate store provider types
+	// Certificate store provider types.
 	CERT_STORE_PROV_SYSTEM_W = 10
 
-	// Certificate store flags
+	// Certificate store flags.
 	CERT_SYSTEM_STORE_LOCAL_MACHINE = 0x00020000
 )
 
 var (
-	// Load crypt32.dll securely from System32 directory only
+	// Load crypt32.dll securely from System32 directory only.
 	crypt32 = &windows.LazyDLL{
 		Name:   "crypt32.dll",
 		System: true,
@@ -129,7 +130,7 @@ func scQuery(name string) (bool, error) {
 	if err != nil {
 		return false, fmt.Errorf("failed to connect to service manager: %w", err)
 	}
-	defer m.Disconnect()
+	defer func() { _ = m.Disconnect() }()
 
 	// Try to open the service
 	s, err := m.OpenService(name)
@@ -196,7 +197,7 @@ func FindCertByFingerprint(storeName string, fingerprint string) (windows.Handle
 		cbData uint32
 		pbData *byte
 	}{
-		cbData: uint32(len(hashBytes)),
+		cbData: uint32(len(hashBytes)), //nolint:gosec // G115 - a SHA1 or SHA256 hash is 20 or 32 bytes
 		pbData: &hashBytes[0],
 	}
 
@@ -216,17 +217,17 @@ func FindCertByFingerprint(storeName string, fingerprint string) (windows.Handle
 	return store, certContext, nil
 }
 
-// closeCertStore closes a certificate store handle
+// closeCertStore closes a certificate store handle.
 func closeCertStore(store windows.Handle) error {
 	return windows.CertCloseStore(store, 0)
 }
 
-// freeCertContext frees a certificate context
+// freeCertContext frees a certificate context.
 func freeCertContext(certContext *windows.CertContext) error {
 	return windows.CertFreeCertificateContext(certContext)
 }
 
-// freeCertStoreCertContext frees both the certificate context and the certificate store handle
+// freeCertStoreCertContext frees both the certificate context and the certificate store handle.
 func freeCertStoreCertContext(store windows.Handle, certContext *windows.CertContext) error {
 	err := freeCertContext(certContext)
 	if err != nil {
@@ -294,7 +295,7 @@ func DecryptProtectedSettings(protectedSettings string, fingerprint string, _ st
 	return result, nil
 }
 
-// cryptDecryptMessage decrypts a CMS/PKCS#7 message using the recipient's certificate
+// cryptDecryptMessage decrypts a CMS/PKCS#7 message using the recipient's certificate.
 func cryptDecryptMessage(pDecryptPara uintptr, pbEncryptedBlob *byte, cbEncryptedBlob uint32, pbDecryptedBlob *byte, pcbDecryptedBlob *uint32, ppXchgCert **windows.CertContext) error {
 	ret, _, err := procCryptDecryptMessage.Call(
 		pDecryptPara,
@@ -310,8 +311,13 @@ func cryptDecryptMessage(pDecryptPara uintptr, pbEncryptedBlob *byte, cbEncrypte
 	return nil
 }
 
-// decryptWithWindowsCryptoAPI uses Windows Crypto API CryptDecryptMessage for direct CMS decryption
+// decryptWithWindowsCryptoAPI uses Windows Crypto API CryptDecryptMessage for direct CMS decryption.
 func decryptWithWindowsCryptoAPI(cmsData []byte, store windows.Handle) ([]byte, error) {
+	if len(cmsData) > math.MaxUint32 {
+		return nil, fmt.Errorf("CMS data is too large: %d bytes", len(cmsData))
+	}
+	cmsSize := uint32(len(cmsData)) //nolint:gosec // G115 - bounded by the check above
+
 	hCertStorePtr := uintptr(store)
 	decryptPara := cryptDecryptMessagePara{
 		cbSize:                   uint32(unsafe.Sizeof(cryptDecryptMessagePara{})),
@@ -326,7 +332,7 @@ func decryptWithWindowsCryptoAPI(cmsData []byte, store windows.Handle) ([]byte, 
 	err := cryptDecryptMessage(
 		uintptr(unsafe.Pointer(&decryptPara)),
 		&cmsData[0],
-		uint32(len(cmsData)),
+		cmsSize,
 		nil,
 		&decryptedSize,
 		nil,
@@ -345,7 +351,7 @@ func decryptWithWindowsCryptoAPI(cmsData []byte, store windows.Handle) ([]byte, 
 	err = cryptDecryptMessage(
 		uintptr(unsafe.Pointer(&decryptPara)),
 		&cmsData[0],
-		uint32(len(cmsData)),
+		cmsSize,
 		&decryptedData[0],
 		&actualSize,
 		nil,
