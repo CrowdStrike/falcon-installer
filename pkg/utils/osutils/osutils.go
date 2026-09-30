@@ -52,12 +52,8 @@ func FalconInstalled(targetOS string) (bool, error) {
 
 		return falconInstalled, nil
 	case "windows":
-		falconInstalled, err := scQuery("csagent")
-		if err != nil {
-			return falconInstalled, fmt.Errorf("error querying service manager: %v", err)
-		}
-
-		return falconInstalled, nil
+		// scQuery's errors already say they came from the service manager.
+		return scQuery("csagent")
 	}
 
 	return falconInstalled, fmt.Errorf("unable to determine if Falcon Sensor is installed and running. Unsupported OS: %s", targetOS)
