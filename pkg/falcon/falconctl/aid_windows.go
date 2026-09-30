@@ -50,7 +50,7 @@ func GetAID() (string, error) {
 		}
 	}
 
-	return "", fmt.Errorf("Cannot read the registry value: %v", err)
+	return "", fmt.Errorf("cannot read the registry value: %v", err)
 }
 
 // getBinaryRegistryValue reads a binary registry value and returns it as a string.
