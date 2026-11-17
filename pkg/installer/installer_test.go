@@ -23,8 +23,16 @@
 package installer
 
 import (
+	"bytes"
+	"log/slog"
+	"os"
+	"path/filepath"
+	"runtime"
 	"slices"
+	"strings"
 	"testing"
+
+	"github.com/crowdstrike/falcon-installer/pkg/falcon/falconctl"
 )
 
 func TestFormatArg(t *testing.T) {
@@ -195,6 +203,52 @@ func TestBuildMacOSArgs_License(t *testing.T) {
 	}
 }
 
+// TestBuildMacOSArgs_LicenseDebugLogRedactsToken passes the macOS license arguments through the
+// falconctl configure path with debug logging enabled, and checks that the provisioning token
+// does not reach the log.
+//
+// The Linux falconctl path is used as the target binary because configure logs its arguments
+// before verifying the binary exists. On a host without a Linux sensor the call logs and then
+// fails, so no falconctl is ever executed. The macOS path is avoided because a developer machine
+// may have a live Falcon sensor installed there.
+//
+// Not parallel: it replaces the process-wide default slog logger.
+func TestBuildMacOSArgs_LicenseDebugLogRedactsToken(t *testing.T) {
+	const linuxFalconctl = "/opt/CrowdStrike/falconctl"
+	if _, err := os.Stat(linuxFalconctl); err == nil {
+		t.Skipf("%s exists; skipping so a real falconctl is not executed", linuxFalconctl)
+	}
+
+	const token = "TEST-PROV-TOKEN" //nolint:gosec // G101 - fake token for the test
+
+	var buf bytes.Buffer
+	prev := slog.Default()
+	slog.SetDefault(slog.New(slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelDebug})))
+	t.Cleanup(func() { slog.SetDefault(prev) })
+
+	fi := FalconInstaller{
+		OSType: "macos",
+		SensorConfig: FalconSensorCLI{
+			CID:               "ABCDEF1234567890ABCDEF1234567890-12",
+			ProvisioningToken: token,
+			Cloud:             "us-1",
+		},
+	}
+
+	err := falconctl.NewSensorConfig("linux").Set(fi.buildMacOSArgs("license"))
+	if err == nil {
+		t.Fatal("expected falconctl lookup to fail on a host without a Linux sensor")
+	}
+
+	logged := buf.String()
+	if !strings.Contains(logged, "Configuring Falcon sensor") {
+		t.Fatalf("configure debug log was not emitted; log output:\n%s", logged)
+	}
+	if strings.Contains(logged, token) {
+		t.Errorf("provisioning token leaked into debug log:\n%s", logged)
+	}
+}
+
 func TestBuildMacOSArgs_NonLicense(t *testing.T) {
 	t.Parallel()
 
@@ -217,6 +271,50 @@ func TestBuildMacOSArgs_NonLicense(t *testing.T) {
 					t.Errorf("buildMacOSArgs(%q) should not contain cloud args, got %v", cmd, got)
 					break
 				}
+			}
+		})
+	}
+}
+
+// TestWriteEmbeddedGpgKeyReplacesLinks verifies a symlink or hard link at the GPG key
+// name is replaced rather than written through, leaving the file it points at untouched.
+func TestWriteEmbeddedGpgKeyReplacesLinks(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		link func(oldname, newname string) error
+	}{
+		{name: "symlink", link: os.Symlink},
+		{name: "hard link", link: os.Link},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			if tt.name == "symlink" && runtime.GOOS == "windows" {
+				t.Skip("creating symlinks requires elevated privileges on Windows")
+			}
+
+			dir := t.TempDir()
+			target := filepath.Join(t.TempDir(), "target")
+			if err := os.WriteFile(target, []byte("original"), 0600); err != nil {
+				t.Fatalf("failed to seed target: %v", err)
+			}
+			if err := tt.link(target, filepath.Join(dir, "falcon-gpg-key")); err != nil {
+				t.Fatalf("failed to create %s: %v", tt.name, err)
+			}
+
+			path, err := writeEmbeddedGpgKey(dir)
+			if err != nil {
+				t.Fatalf("writeEmbeddedGpgKey() error = %v", err)
+			}
+
+			if got, _ := os.ReadFile(path); string(got) != gpgPublicKey {
+				t.Errorf("GPG key file does not contain the embedded key")
+			}
+			if got, _ := os.ReadFile(target); string(got) != "original" {
+				t.Errorf("target was modified through the %s: %q", tt.name, got)
 			}
 		})
 	}

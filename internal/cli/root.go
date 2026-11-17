@@ -23,6 +23,7 @@
 package cli
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -321,13 +322,20 @@ func preRunConfig(cmd *cobra.Command, _ []string) {
 	enableFileLogging := viper.GetBool("enable_file_logging")
 	tmpdir := viper.GetString("tmpdir")
 
-	// If the default temporary directory already exists as a symlink, nest the working directory
-	// one level deeper (e.g. /tmp/falcon/falcon) so downloads land in a directory we create and
-	// own rather than writing directly through the symlink. This only applies to the default
-	// directory; a user-supplied --tmpdir is used as provided.
+	// The default temporary directory is in a shared, world-writable location, so another local
+	// user could create it before the installer runs. Use it only if the installer creates it or
+	// already owns it; otherwise switch to a fresh directory with an unpredictable name. A
+	// user-supplied --tmpdir is used as provided.
 	if tmpdir == defaultTmpDir {
-		if info, err := os.Lstat(tmpdir); err == nil && info.Mode()&os.ModeSymlink != 0 {
-			tmpdir = fmt.Sprintf("%s%s%s", tmpdir, string(os.PathSeparator), "falcon")
+		if err := osutils.CreatePrivateDir(tmpdir); err != nil {
+			if !errors.Is(err, osutils.ErrNotPrivateDir) {
+				log.Fatalf("Error creating temporary directory: %v", err)
+			}
+
+			tmpdir, err = os.MkdirTemp(filepath.Dir(defaultTmpDir), "falcon-")
+			if err != nil {
+				log.Fatalf("Error creating temporary directory: %v", err)
+			}
 			viper.Set("tmpdir", tmpdir)
 		}
 	}
@@ -347,7 +355,7 @@ func preRunConfig(cmd *cobra.Command, _ []string) {
 	}
 
 	if !quiet && enableFileLogging {
-		file, err := os.OpenFile(logFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0600)
+		file, err := utils.OpenFileForAppending(filepath.Dir(logFile), filepath.Base(logFile))
 		if err != nil {
 			log.Fatalf("Error opening log file: %v", err)
 		}

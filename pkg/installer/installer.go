@@ -167,8 +167,7 @@ func Run(fc FalconInstaller) {
 			if gpgKey != "" {
 				slog.Debug("Using provided GPG key", "GPG Key", gpgKey)
 			} else {
-				gpgKey = fmt.Sprintf("%s%s%s", fc.TmpDir, string(os.PathSeparator), "falcon-gpg-key")
-				err = os.WriteFile(gpgKey, []byte(gpgPublicKey), 0600)
+				gpgKey, err = writeEmbeddedGpgKey(fc.TmpDir)
 				if err != nil {
 					log.Fatalf("Error writing GPG key to file: %v", err)
 				}
@@ -266,6 +265,27 @@ func Run(fc FalconInstaller) {
 		}
 		slog.Info("Sensor configuration for the image is complete")
 	}
+}
+
+// writeEmbeddedGpgKey writes the embedded CrowdStrike GPG key into dir and returns its path. Any
+// existing entry at that name is removed first and the file is created exclusively, so a symlink
+// or hard link at that name cannot redirect the write onto another file.
+func writeEmbeddedGpgKey(dir string) (string, error) {
+	f, err := utils.OpenFileForWriting(dir, "falcon-gpg-key")
+	if err != nil {
+		return "", err
+	}
+
+	if _, err := f.WriteString(gpgPublicKey); err != nil {
+		f.Close()
+		return "", fmt.Errorf("failed to write GPG key: %w", err)
+	}
+
+	if err := f.Close(); err != nil {
+		return "", fmt.Errorf("failed to close GPG key file: %w", err)
+	}
+
+	return f.Name(), nil
 }
 
 // buildInstallerArgs returns the arguments for the Falcon sensor installer based on the OS.

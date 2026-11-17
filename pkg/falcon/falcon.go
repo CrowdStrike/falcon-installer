@@ -195,7 +195,7 @@ func GetProvisioningToken(client *client.CrowdStrikeAPISpecification) string {
 	token := ""
 	if payload.Resources[0].TokensRequired != nil && *payload.Resources[0].TokensRequired {
 		token = getProvToken(client, getProvTokenList(client))
-		slog.Debug("Found suitable Falcon installation token", "Token", token)
+		slog.Debug("Found suitable Falcon installation token", "Token", utils.RedactSecret(token))
 	}
 
 	return token

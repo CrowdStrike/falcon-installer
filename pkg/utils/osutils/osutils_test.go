@@ -26,7 +26,9 @@
 package osutils
 
 import (
+	"errors"
 	"os"
+	"path/filepath"
 	"runtime"
 	"strconv"
 	"strings"
@@ -301,4 +303,114 @@ func mustPerm(t *testing.T, dir string) os.FileMode {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 	return info.Mode().Perm()
+}
+
+// TestCreatePrivateDir verifies the default working directory is only used when the installer
+// creates it or already owns it as a real directory.
+func TestCreatePrivateDir(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		setup   func(t *testing.T, dir string)
+		wantErr error
+	}{
+		{
+			name:  "creates missing directory",
+			setup: func(*testing.T, string) {},
+		},
+		{
+			name: "accepts existing directory owned by current user",
+			setup: func(t *testing.T, dir string) {
+				if err := os.Mkdir(dir, 0755); err != nil {
+					t.Fatalf("failed to seed directory: %v", err)
+				}
+			},
+		},
+		{
+			name: "rejects symlink to a directory",
+			setup: func(t *testing.T, dir string) {
+				if err := os.Symlink(t.TempDir(), dir); err != nil {
+					t.Fatalf("failed to seed symlink: %v", err)
+				}
+			},
+			wantErr: ErrNotPrivateDir,
+		},
+		{
+			name: "rejects dangling symlink",
+			setup: func(t *testing.T, dir string) {
+				if err := os.Symlink(filepath.Join(t.TempDir(), "missing"), dir); err != nil {
+					t.Fatalf("failed to seed symlink: %v", err)
+				}
+			},
+			wantErr: ErrNotPrivateDir,
+		},
+		{
+			name: "rejects regular file",
+			setup: func(t *testing.T, dir string) {
+				if err := os.WriteFile(dir, nil, 0600); err != nil {
+					t.Fatalf("failed to seed file: %v", err)
+				}
+			},
+			wantErr: ErrNotPrivateDir,
+		},
+		{
+			name: "rejects fifo without blocking",
+			setup: func(t *testing.T, dir string) {
+				if err := syscall.Mkfifo(dir, 0600); err != nil {
+					t.Fatalf("failed to seed fifo: %v", err)
+				}
+			},
+			wantErr: ErrNotPrivateDir,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			dir := filepath.Join(t.TempDir(), "falcon")
+			tt.setup(t, dir)
+
+			err := CreatePrivateDir(dir)
+			if !errors.Is(err, tt.wantErr) {
+				t.Fatalf("CreatePrivateDir() error = %v, want %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+// TestCreatePrivateDirSetsPerms verifies a newly created directory is private.
+func TestCreatePrivateDirSetsPerms(t *testing.T) {
+	t.Parallel()
+
+	dir := filepath.Join(t.TempDir(), "falcon")
+	if err := CreatePrivateDir(dir); err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	if perm := mustPerm(t, dir); perm != 0700 {
+		t.Errorf("expected permissions 0700, got %o", perm)
+	}
+}
+
+// TestCreatePrivateDirRejectsOtherOwner verifies a directory another user created first is not
+// adopted. Creating a directory owned by someone else requires root.
+func TestCreatePrivateDirRejectsOtherOwner(t *testing.T) {
+	if os.Geteuid() != 0 {
+		t.Skip("requires root to create a directory owned by another user")
+	}
+	t.Parallel()
+
+	dir := filepath.Join(t.TempDir(), "falcon")
+	if err := os.Mkdir(dir, 0700); err != nil {
+		t.Fatalf("failed to seed directory: %v", err)
+	}
+	if err := os.Chown(dir, 65534, 65534); err != nil {
+		t.Fatalf("failed to chown seed directory: %v", err)
+	}
+
+	if err := CreatePrivateDir(dir); !errors.Is(err, ErrNotPrivateDir) {
+		t.Fatalf("CreatePrivateDir() error = %v, want %v", err, ErrNotPrivateDir)
+	}
 }

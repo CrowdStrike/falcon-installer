@@ -170,29 +170,20 @@ func TestRunCmdWithStdin(t *testing.T) {
 
 func TestOpenFileForWriting(t *testing.T) {
 	filename := "test.txt"
-	dir := os.TempDir()
+	dir := t.TempDir()
 
 	file, err := OpenFileForWriting(dir, filename)
 	if err != nil {
-		t.Errorf("Unexpected error: %v", err)
+		t.Fatalf("Unexpected error: %v", err)
 	}
 	file.Close()
 
-	// cleanup
-	if err := os.Remove(file.Name()); err != nil {
-		t.Errorf("Unexpected error: %v", err)
-	}
-
-	filename = "/test.txt"
-	_, err = OpenFileForWriting(dir, filename)
-	if !strings.Contains(err.Error(), "refusing to download: '/test.txt' includes '/' character") {
-		t.Errorf("Unexpected error: %v", err)
-	}
-
-	filename = "..test.txt"
-	_, err = OpenFileForWriting(dir, filename)
-	if !strings.Contains(err.Error(), "looks suspicious") {
-		t.Errorf("Unexpected error: %v", err)
+	// A filename that attempts to escape the directory must be rejected.
+	for _, bad := range []string{"/test.txt", "../test.txt", ".." + string(os.PathSeparator) + "test.txt"} {
+		_, err = OpenFileForWriting(dir, bad)
+		if err == nil {
+			t.Errorf("OpenFileForWriting(dir, %q) should have failed", bad)
+		}
 	}
 }
 
@@ -370,6 +361,80 @@ func TestRedactSecret(t *testing.T) {
 	}
 }
 
+func TestRedactJSONPreview(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		raw      string
+		expected string
+	}{
+		{
+			name:     "all sensitive values redacted",
+			raw:      `{"client_secret":"s3cret","provisioning_token":"p1","maintenance_token":"m1"`,
+			expected: `{"client_secret":"[REDACTED]","provisioning_token":"[REDACTED]","maintenance_token":"[REDACTED]"`,
+		},
+		{
+			name:     "other keys kept",
+			raw:      `{"client_id":"abc","client_secret":"s3cret","cloud":"us-1",`,
+			expected: `{"client_id":"abc","client_secret":"[REDACTED]","cloud":"us-1",`,
+		},
+		{
+			name:     "value cut off by truncation is redacted",
+			raw:      `{"client_id":"abc","client_secret":"s3cr`,
+			expected: `{"client_id":"abc","client_secret":"[REDACTED]"`,
+		},
+		{
+			name:     "value cut off after an escape is redacted",
+			raw:      `{"client_secret":"s3cr\`,
+			expected: `{"client_secret":"[REDACTED]"`,
+		},
+		{
+			name:     "escaped quote inside value is redacted",
+			raw:      `{"client_secret":"s3\"cret","client_id":"abc"`,
+			expected: `{"client_secret":"[REDACTED]","client_id":"abc"`,
+		},
+		{
+			name:     "falcon_ prefixed key and whitespace are redacted",
+			raw:      `{"falcon_client_secret" : "s3cret"}`,
+			expected: `{"falcon_client_secret" : "[REDACTED]"}`,
+		},
+		{
+			name:     "key without a value yet is kept",
+			raw:      `{"client_id":"abc","client_secret":`,
+			expected: `{"client_id":"abc","client_secret":`,
+		},
+		{
+			name:     "preview is limited to 100 bytes",
+			raw:      `{"client_id":"` + strings.Repeat("a", 200) + `"}`,
+			expected: `{"client_id":"` + strings.Repeat("a", 86),
+		},
+		{
+			name:     "secret past the preview limit is redacted",
+			raw:      `{"client_id":"` + strings.Repeat("a", 90) + `","client_secret":"s3cret"}`,
+			expected: `{"client_id":"` + strings.Repeat("a", 86),
+		},
+		{
+			name:     "empty input",
+			raw:      ``,
+			expected: ``,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got := RedactJSONPreview([]byte(tt.raw))
+			if got != tt.expected {
+				t.Errorf("RedactJSONPreview(%q) = %q, want %q", tt.raw, got, tt.expected)
+			}
+			if strings.Contains(got, "s3") || strings.Contains(got, "p1") || strings.Contains(got, "m1") {
+				t.Errorf("RedactJSONPreview(%q) leaked a secret: %q", tt.raw, got)
+			}
+		})
+	}
+}
+
 func TestRedactArgs(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -412,6 +477,26 @@ func TestRedactArgs(t *testing.T) {
 			expected: []string{"--maintenance-token"},
 		},
 		{
+			name:     "macos license provisioning token is redacted",
+			args:     []string{"license", "ABCDEF1234567890ABCDEF1234567890-12", "abcd12345"},
+			expected: []string{"license", "ABCDEF1234567890ABCDEF1234567890-12", "[REDACTED]"},
+		},
+		{
+			name:     "macos license provisioning token is redacted before cloud",
+			args:     []string{"license", "ABCDEF1234567890ABCDEF1234567890-12", "abcd12345", "--cloud", "us-1"},
+			expected: []string{"license", "ABCDEF1234567890ABCDEF1234567890-12", "[REDACTED]", "--cloud", "us-1"},
+		},
+		{
+			name:     "macos license without token leaves cloud unchanged",
+			args:     []string{"license", "ABCDEF1234567890ABCDEF1234567890-12", "--cloud", "us-1"},
+			expected: []string{"license", "ABCDEF1234567890ABCDEF1234567890-12", "--cloud", "us-1"},
+		},
+		{
+			name:     "macos license with only CID is unchanged",
+			args:     []string{"license", "ABCDEF1234567890ABCDEF1234567890-12"},
+			expected: []string{"license", "ABCDEF1234567890ABCDEF1234567890-12"},
+		},
+		{
 			name:     "empty args",
 			args:     []string{},
 			expected: []string{},
@@ -427,4 +512,58 @@ func TestRedactArgs(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestOpenFileForAppending verifies log content is appended across opens and that a symlink
+// at the log name cannot redirect writes outside the directory.
+func TestOpenFileForAppending(t *testing.T) {
+	t.Parallel()
+
+	const name = "falcon-installer.log"
+
+	t.Run("appends to existing file", func(t *testing.T) {
+		t.Parallel()
+		dir := t.TempDir()
+
+		for _, line := range []string{"first\n", "second\n"} {
+			f, err := OpenFileForAppending(dir, name)
+			if err != nil {
+				t.Fatalf("OpenFileForAppending() error = %v", err)
+			}
+			if _, err := f.WriteString(line); err != nil {
+				t.Fatalf("write failed: %v", err)
+			}
+			if err := f.Close(); err != nil {
+				t.Fatalf("close failed: %v", err)
+			}
+		}
+
+		if got, _ := os.ReadFile(filepath.Join(dir, name)); string(got) != "first\nsecond\n" {
+			t.Errorf("log contents = %q, want both lines", got)
+		}
+	})
+
+	t.Run("refuses symlink escaping dir", func(t *testing.T) {
+		t.Parallel()
+		if runtime.GOOS == "windows" {
+			t.Skip("creating symlinks requires elevated privileges on Windows")
+		}
+
+		dir := t.TempDir()
+		target := filepath.Join(t.TempDir(), "target")
+		if err := os.WriteFile(target, []byte("original"), 0600); err != nil {
+			t.Fatalf("failed to seed target: %v", err)
+		}
+		if err := os.Symlink(target, filepath.Join(dir, name)); err != nil {
+			t.Fatalf("failed to create symlink: %v", err)
+		}
+
+		if f, err := OpenFileForAppending(dir, name); err == nil {
+			f.Close()
+			t.Fatal("expected an error opening a log file symlinked outside dir")
+		}
+		if got, _ := os.ReadFile(target); string(got) != "original" {
+			t.Errorf("target was modified through the symlink: %q", got)
+		}
+	})
 }

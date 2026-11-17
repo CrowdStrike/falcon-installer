@@ -30,10 +30,13 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"encoding/pem"
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"regexp"
 	"strings"
+	"syscall"
 
 	"github.com/crowdstrike/falcon-installer/pkg/dpkg"
 	"github.com/crowdstrike/falcon-installer/pkg/rpm"
@@ -94,6 +97,47 @@ func EnsureDirPerms(dir string) error {
 
 	if err := os.Chown(dir, 0, 0); err != nil {
 		return fmt.Errorf("failed to set ownership on directory %s: %w", dir, err)
+	}
+
+	return nil
+}
+
+// CreatePrivateDir creates dir with 0700 permissions, or accepts it if it already exists as a real
+// directory owned by the current user. It returns ErrNotPrivateDir if dir is a symlink, is not a
+// directory, or is owned by another user: another local user may have created it ahead of the
+// installer, and its existing contents would remain after a later chmod or chown.
+//
+// Once dir is known to be ours, no other user can rename or replace it as long as its parent has
+// the sticky bit set, as /tmp does.
+func CreatePrivateDir(dir string) error {
+	err := os.Mkdir(dir, 0700)
+	if err == nil {
+		return nil
+	}
+	if !errors.Is(err, fs.ErrExist) {
+		return fmt.Errorf("failed to create directory %s: %w", dir, err)
+	}
+
+	// O_NOFOLLOW only rejects a symlink at dir itself; earlier path elements such as a symlinked
+	// /tmp are still followed. O_DIRECTORY rejects anything that is not a directory, including a
+	// FIFO that would otherwise block the open.
+	f, err := os.OpenFile(dir, os.O_RDONLY|syscall.O_NOFOLLOW|syscall.O_DIRECTORY, 0)
+	if errors.Is(err, syscall.ELOOP) || errors.Is(err, syscall.ENOTDIR) {
+		return fmt.Errorf("%s is not a real directory: %w", dir, ErrNotPrivateDir)
+	}
+	if err != nil {
+		return fmt.Errorf("failed to open directory %s: %w", dir, err)
+	}
+	defer f.Close()
+
+	info, err := f.Stat()
+	if err != nil {
+		return fmt.Errorf("failed to stat directory %s: %w", dir, err)
+	}
+
+	st, ok := info.Sys().(*syscall.Stat_t)
+	if !ok || int(st.Uid) != os.Geteuid() {
+		return fmt.Errorf("%s is owned by another user: %w", dir, ErrNotPrivateDir)
 	}
 
 	return nil
