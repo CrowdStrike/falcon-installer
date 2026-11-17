@@ -253,6 +253,7 @@ func preRunConfig(cmd *cobra.Command, _ []string) {
 
 	cfgFile := viper.GetString("config")
 	if cfgFile != "" {
+		viper.SetOptions(viper.WithCodecRegistry(newCodecRegistry()))
 		viper.AddConfigPath(".")
 		viper.SetConfigFile(cfgFile)
 
