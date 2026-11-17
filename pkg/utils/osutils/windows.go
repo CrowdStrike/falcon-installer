@@ -29,13 +29,16 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io/fs"
 	"math"
 	"os"
 	"strings"
 	"syscall"
 	"unsafe"
 
+	"github.com/crowdstrike/falcon-installer/pkg/utils"
 	"golang.org/x/sys/windows"
 	"golang.org/x/sys/windows/registry"
 	"golang.org/x/sys/windows/svc/mgr"
@@ -121,6 +124,96 @@ func EnsureDirPerms(dir string) error {
 	}
 
 	return nil
+}
+
+// CreatePrivateDir creates dir, or accepts it if it already exists as a real directory owned by
+// the current process. It returns ErrNotPrivateDir if dir is a symlink, is not a directory, or is
+// owned by another account, so the caller can switch to a fresh directory instead of writing into
+// a directory another user may have pre-created.
+func CreatePrivateDir(dir string) error {
+	// Mkdir fails if anything already exists at dir, so a directory another user creates between
+	// this call and the checks below is still inspected rather than silently accepted.
+	err := os.Mkdir(dir, 0700)
+	if err == nil {
+		return nil
+	}
+	if !errors.Is(err, fs.ErrExist) {
+		return fmt.Errorf("failed to create directory %s: %w", dir, err)
+	}
+
+	info, err := os.Lstat(dir)
+	if err != nil {
+		return fmt.Errorf("failed to stat %s: %w", dir, err)
+	}
+
+	if info.Mode()&os.ModeSymlink != 0 {
+		return fmt.Errorf("%s is a symlink: %w", dir, ErrNotPrivateDir)
+	}
+	if !info.IsDir() {
+		return fmt.Errorf("%s is not a directory: %w", dir, ErrNotPrivateDir)
+	}
+
+	owned, err := ownedByCurrentProcess(dir)
+	if err != nil {
+		return fmt.Errorf("failed to check ownership of %s: %w", dir, err)
+	}
+	if !owned {
+		return fmt.Errorf("%s is owned by another user: %w", dir, ErrNotPrivateDir)
+	}
+
+	return nil
+}
+
+// ownedByCurrentProcess reports whether path is owned by the current process's user or by the
+// default owner its token assigns to new objects. For an elevated administrator or SYSTEM the
+// default owner is usually the Administrators group rather than the user, so a directory the
+// installer created on an earlier run is owned by that group.
+func ownedByCurrentProcess(path string) (bool, error) {
+	sd, err := windows.GetNamedSecurityInfo(path, windows.SE_FILE_OBJECT, windows.OWNER_SECURITY_INFORMATION)
+	if err != nil {
+		return false, fmt.Errorf("failed to read owner: %w", err)
+	}
+
+	owner, _, err := sd.Owner()
+	if err != nil {
+		return false, fmt.Errorf("failed to read owner: %w", err)
+	}
+
+	token := windows.GetCurrentProcessToken()
+
+	user, err := token.GetTokenUser()
+	if err != nil {
+		return false, fmt.Errorf("failed to read process user: %w", err)
+	}
+	if windows.EqualSid(owner, user.User.Sid) {
+		return true, nil
+	}
+
+	defaultOwner, err := tokenDefaultOwner(token)
+	if err != nil {
+		return false, err
+	}
+
+	return windows.EqualSid(owner, defaultOwner), nil
+}
+
+// tokenDefaultOwner returns the SID the token assigns as the owner of objects it creates.
+func tokenDefaultOwner(token windows.Token) (*windows.SID, error) {
+	size := uint32(64)
+	for {
+		buf := make([]byte, size)
+		needed := size
+		err := windows.GetTokenInformation(token, windows.TokenOwner, &buf[0], size, &needed)
+		if err == nil {
+			// The buffer holds a TOKEN_OWNER: a pointer to a SID stored later in the same buffer.
+			sid := *(**windows.SID)(unsafe.Pointer(&buf[0])) //nolint:gosec // G103 - layout is defined by GetTokenInformation
+			return sid.Copy()
+		}
+		if !errors.Is(err, windows.ERROR_INSUFFICIENT_BUFFER) || needed <= size {
+			return nil, fmt.Errorf("failed to read default owner: %w", err)
+		}
+		size = needed
+	}
 }
 
 // scQuery queries the Windows service manager for the presence of a service.
@@ -280,16 +373,12 @@ func DecryptProtectedSettings(protectedSettings string, fingerprint string, _ st
 		return nil, fmt.Errorf("resource cleanup failed: %w", cleanErr)
 	}
 
-	// Parse the JSON output
+	// Parse the JSON output. The preview helps troubleshoot a malformed payload, which cannot be
+	// inspected any other way once decrypted, with secret values removed.
 	var result map[string]any
 	if err := json.Unmarshal(decryptedData, &result); err != nil {
-		// If JSON parsing fails, return both the error and the output for inspection
-		previewLen := 100
-		if len(decryptedData) < previewLen {
-			previewLen = len(decryptedData)
-		}
 		return nil, fmt.Errorf("failed to parse JSON: %w (output: %s)",
-			err, string(decryptedData[:previewLen]))
+			err, utils.RedactJSONPreview(decryptedData))
 	}
 
 	return result, nil

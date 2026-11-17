@@ -118,29 +118,40 @@ func RunCmd(cmnd string, args []string, opts ...CmdOption) ([]byte, []byte, erro
 	return stdout.Bytes(), stderr.Bytes(), err
 }
 
-// OpenFileForWriting opens a file for writing, creating the directory if it doesn't exist.
+// OpenFileForWriting opens filename in dir for exclusive creation with 0600 permissions, removing
+// any pre-existing entry first. The open is scoped to dir with os.Root, so a filename containing
+// path separators or ".." components cannot escape dir regardless of the platform.
 func OpenFileForWriting(dir, filename string) (*os.File, error) {
-	if strings.Contains(filename, "/") {
-		return nil, fmt.Errorf("refusing to download: '%s' includes '/' character", filename)
-	}
-
-	path := filepath.Join(dir, filename)
-	safeLocation := filepath.Clean(path)
-
-	if strings.Contains(safeLocation, "..") {
-		return nil, fmt.Errorf("refusing to download: path '%s' looks suspicious", safeLocation)
-	}
-
 	if err := os.MkdirAll(dir, 0700); err != nil {
 		return nil, fmt.Errorf("failed to create directory: %w", err)
 	}
 
-	// Remove any pre-existing file or symlink at the destination filename
-	if err := os.Remove(safeLocation); err != nil && !os.IsNotExist(err) {
-		return nil, fmt.Errorf("failed to remove existing file %s: %w", safeLocation, err)
+	root, err := os.OpenRoot(dir)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open directory %s: %w", dir, err)
+	}
+	defer root.Close()
+
+	// Remove any pre-existing file or symlink at the destination filename so the exclusive
+	// create below can succeed on a retry after a partial download.
+	if err := root.Remove(filename); err != nil && !os.IsNotExist(err) {
+		return nil, fmt.Errorf("failed to remove existing file %s: %w", filename, err)
 	}
 
-	return os.OpenFile(safeLocation, os.O_CREATE|os.O_WRONLY|os.O_EXCL, 0600)
+	return root.OpenFile(filename, os.O_CREATE|os.O_WRONLY|os.O_EXCL, 0600)
+}
+
+// OpenFileForAppending opens filename in dir for appending, creating it with 0600 permissions if
+// needed. The open is scoped to dir with os.Root, so a symlink at filename cannot redirect
+// writes to a file outside dir.
+func OpenFileForAppending(dir, filename string) (*os.File, error) {
+	root, err := os.OpenRoot(dir)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open directory %s: %w", dir, err)
+	}
+	defer root.Close()
+
+	return root.OpenFile(filename, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0600)
 }
 
 // VerifyFileHash computes the SHA256 of the file at path and compares it to expected (a hex-encoded
@@ -198,5 +209,32 @@ func RedactArgs(args []string) []string {
 			}
 		}
 	}
+
+	if len(redacted) > 2 && redacted[0] == "license" && !strings.HasPrefix(redacted[2], "-") {
+		redacted[2] = RedactSecret(redacted[2])
+	}
+
+	return redacted
+}
+
+// sensitiveJSONValue matches the string value of a sensitive key in JSON, with or without the
+// falcon_ prefix config files may use. The value may contain escaped quotes, and the closing quote
+// is optional so a value cut off by truncated input is still matched.
+var sensitiveJSONValue = regexp.MustCompile(
+	`("(?:falcon_)?(?:client_secret|provisioning_token|maintenance_token)"\s*:\s*)"(?:[^"\\]|\\.)*(?:"|\\?$)`,
+)
+
+// jsonPreviewLen is the maximum number of bytes RedactJSONPreview returns.
+const jsonPreviewLen = 100
+
+// RedactJSONPreview returns the first bytes of raw, which may be malformed or truncated JSON, with
+// the values of sensitive keys replaced by "[REDACTED]". The rest of the content is kept so the
+// preview can be used to troubleshoot why the JSON failed to parse.
+func RedactJSONPreview(raw []byte) string {
+	redacted := sensitiveJSONValue.ReplaceAllString(string(raw), `$1"[REDACTED]"`)
+	if len(redacted) > jsonPreviewLen {
+		redacted = redacted[:jsonPreviewLen]
+	}
+
 	return redacted
 }

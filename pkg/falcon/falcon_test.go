@@ -22,7 +22,37 @@
 
 package falcon
 
-import "testing"
+import (
+	"bytes"
+	"log/slog"
+	"strings"
+	"testing"
+
+	"github.com/crowdstrike/falcon-installer/pkg/utils"
+)
+
+// TestProvisioningTokenDebugLogRedactsToken checks that a provisioning token logged the way
+// GetProvisioningToken logs it does not reach the debug log.
+//
+// Not parallel: it replaces the process-wide default slog logger.
+func TestProvisioningTokenDebugLogRedactsToken(t *testing.T) {
+	const token = "TEST-PROV-TOKEN" //nolint:gosec // G101 - fake token for the test
+
+	var buf bytes.Buffer
+	prev := slog.Default()
+	slog.SetDefault(slog.New(slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelDebug})))
+	t.Cleanup(func() { slog.SetDefault(prev) })
+
+	slog.Debug("Found suitable Falcon installation token", "Token", utils.RedactSecret(token))
+
+	logged := buf.String()
+	if strings.Contains(logged, token) {
+		t.Errorf("provisioning token leaked into debug log:\n%s", logged)
+	}
+	if !strings.Contains(logged, "[REDACTED]") {
+		t.Errorf("debug log missing redacted token placeholder:\n%s", logged)
+	}
+}
 
 func TestExtractSemver(t *testing.T) {
 	tests := []struct {

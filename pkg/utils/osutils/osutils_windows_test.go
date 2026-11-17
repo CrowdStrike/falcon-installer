@@ -26,6 +26,10 @@
 package osutils
 
 import (
+	"errors"
+	"os"
+	"os/exec"
+	"path/filepath"
 	"testing"
 )
 
@@ -158,5 +162,84 @@ func TestInstalledFalconVersion(t *testing.T) {
 
 	if got == "" {
 		t.Errorf("Expected version string, got empty string")
+	}
+}
+
+// TestWinCreatePrivateDir verifies a missing directory is created, a directory owned by the
+// current process is accepted, and a symlink, file, or directory owned by another account is
+// rejected so the caller can switch to a fresh directory.
+func TestWinCreatePrivateDir(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		setup   func(t *testing.T, dir string)
+		wantErr error
+	}{
+		{
+			name:  "creates missing directory",
+			setup: func(*testing.T, string) {},
+		},
+		{
+			name: "accepts existing directory",
+			setup: func(t *testing.T, dir string) {
+				if err := os.Mkdir(dir, 0700); err != nil {
+					t.Fatalf("failed to seed directory: %v", err)
+				}
+			},
+		},
+		{
+			name: "rejects symlink to a directory",
+			setup: func(t *testing.T, dir string) {
+				if err := os.Symlink(t.TempDir(), dir); err != nil {
+					t.Skipf("creating symlinks requires elevated privileges or Developer Mode: %v", err)
+				}
+			},
+			wantErr: ErrNotPrivateDir,
+		},
+		{
+			name: "rejects regular file",
+			setup: func(t *testing.T, dir string) {
+				if err := os.WriteFile(dir, nil, 0600); err != nil {
+					t.Fatalf("failed to seed file: %v", err)
+				}
+			},
+			wantErr: ErrNotPrivateDir,
+		},
+		{
+			name: "rejects directory owned by another account",
+			setup: func(t *testing.T, dir string) {
+				if err := os.Mkdir(dir, 0700); err != nil {
+					t.Fatalf("failed to seed directory: %v", err)
+				}
+				// Setting an owner other than yourself requires SeRestorePrivilege, which an
+				// elevated administrator or SYSTEM has.
+				out, err := exec.Command("icacls", dir, "/setowner", "*S-1-5-19").CombinedOutput() // LOCAL SERVICE
+				if err != nil {
+					t.Skipf("cannot set another owner without SeRestorePrivilege: %v: %s", err, out)
+				}
+			},
+			wantErr: ErrNotPrivateDir,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			dir := filepath.Join(t.TempDir(), "falcon")
+			tt.setup(t, dir)
+
+			err := CreatePrivateDir(dir)
+			if !errors.Is(err, tt.wantErr) {
+				t.Fatalf("CreatePrivateDir() error = %v, want %v", err, tt.wantErr)
+			}
+
+			if tt.wantErr == nil {
+				if info, err := os.Lstat(dir); err != nil || !info.IsDir() {
+					t.Errorf("expected %s to be a directory, got info=%v err=%v", dir, info, err)
+				}
+			}
+		})
 	}
 }

@@ -23,6 +23,7 @@
 package osutils
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -33,6 +34,10 @@ import (
 	"github.com/crowdstrike/falcon-installer/pkg/pkgutil"
 	"github.com/crowdstrike/falcon-installer/pkg/rpm"
 )
+
+// ErrNotPrivateDir indicates that an existing directory cannot be used as a private working
+// directory because it is a symlink, is not a directory, or is owned by another user.
+var ErrNotPrivateDir = errors.New("not a private directory")
 
 // FalconInstalled checks if the Falcon Sensor is installed on the target OS.
 func FalconInstalled(targetOS string) (bool, error) {
