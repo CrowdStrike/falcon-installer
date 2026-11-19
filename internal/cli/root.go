@@ -122,6 +122,7 @@ func rootCmd() *cobra.Command {
 	apiFlag.String("sensor-update-policy", defaultSensorUpdatePolicy, "The sensor update policy name to use for sensor installation")
 	apiFlag.String("sensor-version", "", "The sensor version to update or install (overrides sensor-update-policy)")
 	apiFlag.String("user-agent", "", "User agent string to append to use for API requests")
+	apiFlag.Uint("max-tries", 11, "Maximum number of attempts for each API request (0 = unlimited)")
 	rootCmd.Flags().AddFlagSet(apiFlag)
 	err := viper.BindPFlags(apiFlag)
 	if err != nil {

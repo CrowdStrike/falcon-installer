@@ -39,6 +39,7 @@ Falcon API Flags:
       --client-id string              Client ID for accessing CrowdStrike Falcon Platform
       --client-secret string          Client Secret for accessing CrowdStrike Falcon Platform
       --cloud string                  Falcon cloud abbreviation (e.g. us-1, us-2, eu-1, us-gov-1, us-gov-2) (default "autodiscover")
+      --max-tries uint                Maximum number of attempts for each API request (0 = unlimited) (default 11)
       --member-cid string             Member CID for MSSP (for cases when OAuth2 authenticates multiple CIDs)
       --sensor-update-policy string   The sensor update policy name to use for sensor installation (default "platform_default")
       --sensor-version string         The sensor version to update or install (overrides sensor-update-policy)
